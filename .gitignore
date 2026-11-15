@@ -1,0 +1,21 @@
+
+# Gradle
+.gradle/
+**/build/
+
+# Android Studio
+.idea/
+
+# Local configuration
+local.properties
+*.iml
+
+# Kotlin
+.kotlin/
+
+# Logs
+*.log
+
+# Operating system
+.DS_Store
+Thumbs.db
