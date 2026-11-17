@@ -1,4 +1,3 @@
-
 package com.lumi.app.core.components
 
 import androidx.compose.material3.Icon
@@ -15,6 +14,7 @@ import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Checklist
 import com.lumi.app.ui.theme.LumiColors
 
 data class BottomNavItem(
@@ -32,29 +32,36 @@ fun LumiBottomBar(
     val items = listOf(
         BottomNavItem("Inicio", Icons.Default.Home, "home"),
         BottomNavItem("Materias", Icons.Default.Book, "subjects"),
+        BottomNavItem("Tareas", Icons.Default.Checklist, "tasks"),
         BottomNavItem("Estudio", Icons.Default.Timer, "study"),
         BottomNavItem("Tienda", Icons.Default.ShoppingCart, "store"),
         BottomNavItem("Perfil", Icons.Default.Person, "profile")
     )
-
 
     NavigationBar(
         containerColor = LumiColors.White,
         contentColor = LumiColors.Dark
     ) {
         items.forEach { item ->
+
             NavigationBarItem(
                 selected = selectedRoute == item.route,
-                onClick = { onItemSelected(item.route) },
+
+                onClick = {
+                    onItemSelected(item.route)
+                },
+
                 icon = {
                     Icon(
                         imageVector = item.icon,
                         contentDescription = item.title
                     )
                 },
+
                 label = {
                     Text(item.title)
                 },
+
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = LumiColors.Dark,
                     selectedTextColor = LumiColors.Dark,

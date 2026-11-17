@@ -1,4 +1,3 @@
-
 package com.lumi.app.core.navigation
 
 import androidx.compose.runtime.Composable
@@ -12,6 +11,11 @@ import com.lumi.app.features.auth.LoginScreen
 import com.lumi.app.features.auth.RegisterScreen
 import com.lumi.app.features.home.HomeScreen
 import androidx.compose.material3.Text
+import com.lumi.app.features.subjects.SubjectsScreen
+import com.lumi.app.features.tasks.TasksScreen
+import com.lumi.app.features.study.StudyScreen
+import com.lumi.app.features.store.StoreScreen
+import com.lumi.app.features.profile.ProfileScreen
 
 
 @Composable
@@ -79,19 +83,53 @@ fun AppNavigation() {
             }
 
         composable(Screen.Subjects.route) {
-            // Aquí construiremos SubjectsScreen
+            SubjectsScreen(
+                onNavigate = { route ->
+                    navController.navigate(route) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        composable(Screen.Tasks.route) {
+            TasksScreen(
+                onNavigate = { route ->
+                    navController.navigate(route) {
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
 
         composable(Screen.Study.route) {
-            // Aquí construiremos StudyScreen
+            StudyScreen(
+                onNavigate = { route ->
+                    navController.navigate(route) {
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
 
         composable(Screen.Profile.route) {
-            // Aquí construiremos ProfileScreen
+            ProfileScreen(
+                onNavigate = { route ->
+                    navController.navigate(route) {
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
 
         composable(Screen.Store.route) {
-            Text("Tienda de Lumi 🛍️")
+            StoreScreen(
+                onNavigate = { route ->
+                    navController.navigate(route) {
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
     }
 }

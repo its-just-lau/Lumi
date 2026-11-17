@@ -1,4 +1,3 @@
-
 package com.lumi.app.core.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,7 +7,6 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.lumi.app.ui.theme.LumiColors
 
@@ -16,25 +14,32 @@ import com.lumi.app.ui.theme.LumiColors
 fun LumiTextField(
     value: String,
     onValueChange: (String) -> Unit,
-    label: String,
+    label: String = "",
     modifier: Modifier = Modifier,
     placeholder: String = "",
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    leadingIcon: (@Composable () -> Unit)? = null
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier.fillMaxWidth(),
         enabled = enabled,
-        label = { Text(label) },
+        label = if (label.isNotBlank()) {
+            { Text(label) }
+        } else null,
         placeholder = {
-            if (placeholder.isNotEmpty()) {
+            if (placeholder.isNotBlank()) {
                 Text(placeholder)
             }
         },
+        leadingIcon = leadingIcon,
         shape = RoundedCornerShape(14.dp),
         singleLine = true,
         colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = LumiColors.White,
+            unfocusedContainerColor = LumiColors.White,
+            disabledContainerColor = LumiColors.White,
             focusedBorderColor = LumiColors.YellowStrong,
             unfocusedBorderColor = LumiColors.WarmGray,
             focusedLabelColor = LumiColors.Dark,
