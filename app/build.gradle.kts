@@ -54,5 +54,13 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.9.6")
     implementation("androidx.datastore:datastore-preferences:1.2.0")
+    // Retrofit: comunicación con el backend
+    implementation("com.squareup.retrofit2:retrofit:3.0.0")
+
+// Conversión JSON
+    implementation("com.squareup.retrofit2:converter-gson:3.0.0")
+
+// Corrutinas para operaciones asíncronas
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
 }

@@ -24,76 +24,112 @@ import com.lumi.app.features.subjects.components.SubjectCard
 import com.lumi.app.features.subjects.model.Subject
 import com.lumi.app.features.subjects.model.Semester
 import com.lumi.app.ui.theme.LumiColors
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.lumi.app.data.repositories.SubjectDependencies
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import com.lumi.app.features.subjects.SubjectViewModel
+import com.lumi.app.features.subjects.SubjectViewModelFactory
+import com.lumi.app.features.subjects.SubjectsUiState
 
 @Composable
 fun SubjectsScreen(
     onNavigate: (String) -> Unit
 ) {
-    val semesters = remember {
-        listOf(
-            Semester(1, "7.º semestre"),
-            Semester(2, "6.º semestre"),
-            Semester(3, "5.º semestre")
-        )
+    // ViewModel conectado con Retrofit
+    val subjectViewModel: SubjectViewModel = viewModel(
+        factory = SubjectViewModelFactory(SubjectDependencies.repository)
+    )
+
+    val uiState by subjectViewModel.uiState.collectAsState()
+
+    val creationState by subjectViewModel.creationState.collectAsState()
+
+    // Cargar materias y semestres al entrar a la pantalla
+    LaunchedEffect(Unit) {
+        subjectViewModel.loadSubjects()
     }
 
-    var subjects by remember {
-        mutableStateOf(
-            listOf(
-                Subject(
-                    1, "Programación", 1,
-                    color = 0xFFFFE6A3,
-                    progress = 65
-                ),
-                Subject(
-                    2, "Bases de datos", 1,
-                    color = 0xFFDCE7FF,
-                    progress = 40
-                ),
-                Subject(
-                    3, "Matemáticas", 1,
-                    color = 0xFFFFDFDF,
-                    progress = 20
-                ),
-                Subject(
-                    4, "Redes", 1,
-                    color = 0xFFDDF1DF,
-                    progress = 80
-                ),
-                Subject(
-                    5, "Inglés",
-                    color = 0xFFE9DFFF,
-                    progress = 30
-                ),
-                Subject(
-                    6, "Diseño UX/UI",
-                    color = 0xFFFFE3CF,
-                    progress = 15
-                ),
-                Subject(
-                    7, "Nueva materia", 1,
-                    color = 0xFFFFE6A3,
-                    isDraft = true
-                )
+    // Convertir las respuestas de la API a los modelos de la interfaz
+    val semesters = (uiState as? SubjectsUiState.Success)
+        ?.semesters
+        ?.map { semesterResponse ->
+            Semester(
+                id = semesterResponse.id,
+                name = semesterResponse.name
             )
-        )
-    }
+        } ?: emptyList()
+
+    val subjects = (uiState as? SubjectsUiState.Success)
+        ?.subjects
+        ?.filter { it.status == "active" }
+        ?.map { subjectResponse ->
+            Subject(
+                id = subjectResponse.id,
+                name = subjectResponse.name,
+                semesterId = subjectResponse.semesterId,
+                description = subjectResponse.description,
+                color = subjectResponse.color
+                    ?.removePrefix("#")
+                    ?.let { hex ->
+                        when (hex.length) {
+                            6 -> ("FF$hex").toLongOrNull(16)
+                            8 -> hex.toLongOrNull(16)
+                            else -> null
+                        }
+                    } ?: 0xFFFFE6A3
+            )
+        } ?: emptyList()
 
     var searchText by remember {
         mutableStateOf("")
     }
 
     var selectedFilter by remember {
-        mutableStateOf("7.º semestre")
+        mutableStateOf("Todos")
     }
 
-    val filters = listOf(
-        "Todos",
-        "7.º semestre",
-        "6.º semestre",
-        "5.º semestre",
-        "Independientes"
+    // Estado del formulario de nueva materia
+    var showAddSubjectDialog by remember {
+        mutableStateOf(false)
+    }
+
+    var subjectName by remember {
+        mutableStateOf("")
+    }
+
+    var subjectDescription by remember {
+        mutableStateOf("")
+    }
+
+    var selectedColor by remember {
+        mutableStateOf("#FFD83D")
+    }
+
+    var selectedSemesterId by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    var semesterMenuExpanded by remember {
+        mutableStateOf(false)
+    }
+
+// Colores disponibles para las tarjetas
+    val subjectColors = listOf(
+        "#FFD83D",
+        "#FFB8A2",
+        "#B9D9FF",
+        "#BCE6C5",
+        "#D8C5F5",
+        "#FFC9DF"
     )
+
+    val filters = listOf("Todos") +
+            semesters.map { it.name } +
+            "Independientes"
 
     val activeSubjects = subjects.filter {
         !it.isDraft
@@ -126,6 +162,21 @@ fun SubjectsScreen(
         }
 
         matchesSearch && matchesFilter
+    }
+
+    LaunchedEffect(creationState) {
+        when (creationState) {
+            SubjectCreationState.Success -> {
+                showAddSubjectDialog = false
+                subjectName = ""
+                subjectDescription = ""
+                selectedColor = "#FFD83D"
+                selectedSemesterId = null
+                subjectViewModel.resetCreationState()
+            }
+
+            else -> Unit
+        }
     }
 
     Scaffold(
@@ -164,7 +215,7 @@ fun SubjectsScreen(
                 LumiButton(
                     text = "+",
                     onClick = {
-                        // Próximamente: registro de materia
+                        showAddSubjectDialog = true
                     },
                     modifier = Modifier.width(55.dp)
                 )
@@ -202,105 +253,309 @@ fun SubjectsScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             // CONTENIDO DE MATERIAS
-            if (activeSubjects.isEmpty() && draftSubjects.isEmpty()) {
+            when (val state = uiState) {
 
-                EmptySubjectsState(
-                    onAddSubject = {
-                        // Próximamente: registro de materia
-                    }
-                )
-
-            } else {
-
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 20.dp)
-                ) {
-
-                    // MATERIAS ACTIVAS
-                    item(
-                        span = {
-                            GridItemSpan(2)
-                        }
+                SubjectsUiState.Idle,
+                SubjectsUiState.Loading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "Materias activas",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = LumiColors.Dark,
-                            modifier = Modifier.padding(
-                                bottom = 4.dp
-                            )
+                        CircularProgressIndicator(
+                            color = LumiColors.YellowStrong
                         )
                     }
+                }
 
-                    if (filteredSubjects.isEmpty()) {
-                        item(
-                            span = {
-                                GridItemSpan(2)
+                is SubjectsUiState.Error -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "No pudimos cargar tus materias",
+                            color = LumiColors.Dark,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = state.message,
+                            color = LumiColors.Dark
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        LumiButton(
+                            text = "Reintentar",
+                            onClick = {
+                                subjectViewModel.loadSubjects()
                             }
-                        ) {
-                            Text(
-                                text = "No encontramos materias en esta selección.",
-                                color = LumiColors.Dark,
-                                modifier = Modifier.padding(
-                                    vertical = 12.dp
-                                )
-                            )
-                        }
-                    } else {
-                        items(
-                            items = filteredSubjects,
-                            key = { it.id }
-                        ) { subject ->
-
-                            SubjectCard(
-                                subject = subject,
-                                semesterName = semesters
-                                    .firstOrNull {
-                                        it.id == subject.semesterId
-                                    }
-                                    ?.name
-                            )
-                        }
+                        )
                     }
+                }
 
-                    // BORRADORES
-                    if (draftSubjects.isNotEmpty()) {
+                is SubjectsUiState.Success -> {
 
-                        item(
-                            span = {
-                                GridItemSpan(2)
+                    if (activeSubjects.isEmpty()) {
+                        EmptySubjectsState(
+                            onAddSubject = {
+                                showAddSubjectDialog = true
                             }
+                        )
+                    } else {
+
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(bottom = 20.dp)
                         ) {
-                            Text(
-                                text = "Borradores (${draftSubjects.size})",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = LumiColors.Dark,
-                                modifier = Modifier.padding(
-                                    top = 12.dp,
-                                    bottom = 4.dp
+
+                            // MATERIAS ACTIVAS
+                            item(
+                                span = {
+                                    GridItemSpan(2)
+                                }
+                            ) {
+                                Text(
+                                    text = "Materias activas",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = LumiColors.Dark,
+                                    modifier = Modifier.padding(bottom = 4.dp)
                                 )
-                            )
-                        }
+                            }
 
-                        items(
-                            items = draftSubjects,
-                            key = { it.id }
-                        ) { subject ->
+                            if (filteredSubjects.isEmpty()) {
+                                item(
+                                    span = {
+                                        GridItemSpan(2)
+                                    }
+                                ) {
+                                    Text(
+                                        text = "No encontramos materias en esta selección.",
+                                        color = LumiColors.Dark,
+                                        modifier = Modifier.padding(vertical = 12.dp)
+                                    )
+                                }
+                            } else {
+                                items(
+                                    items = filteredSubjects,
+                                    key = { it.id }
+                                ) { subject ->
 
-                            SubjectCard(
-                                subject = subject,
-                                isDraft = true
-                            )
+                                    SubjectCard(
+                                        subject = subject,
+                                        semesterName = semesters
+                                            .firstOrNull {
+                                                it.id == subject.semesterId
+                                            }
+                                            ?.name
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
         }
     }
+
+// FORMULARIO PARA AGREGAR MATERIA
+    if (showAddSubjectDialog) {
+
+        AlertDialog(
+            onDismissRequest = {
+                showAddSubjectDialog = false
+            },
+            title = {
+                Text(
+                    text = "Nueva materia",
+                    fontWeight = FontWeight.Bold,
+                    color = LumiColors.Dark
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+
+                    // Nombre
+                    OutlinedTextField(
+                        value = subjectName,
+                        onValueChange = { subjectName = it },
+                        label = { Text("Nombre de la materia") },
+                        placeholder = {
+                            Text("Ej. Programación")
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // Descripción
+                    OutlinedTextField(
+                        value = subjectDescription,
+                        onValueChange = { subjectDescription = it },
+                        label = { Text("Descripción") },
+                        placeholder = {
+                            Text("Describe brevemente la materia")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 3
+                    )
+
+                    // Selector de color
+                    Text(
+                        text = "Color de la tarjeta",
+                        fontWeight = FontWeight.SemiBold,
+                        color = LumiColors.Dark
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        subjectColors.forEach { colorHex ->
+
+                            val colorValue = Color(
+                                android.graphics.Color.parseColor(colorHex)
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .background(
+                                        color = colorValue,
+                                        shape = CircleShape
+                                    )
+                                    .clickable {
+                                        selectedColor = colorHex
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (selectedColor == colorHex) {
+                                    Text(
+                                        text = "✓",
+                                        color = LumiColors.Dark,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Selector de semestre
+                    Text(
+                        text = "Semestre",
+                        fontWeight = FontWeight.SemiBold,
+                        color = LumiColors.Dark
+                    )
+
+                    Box {
+                        OutlinedButton(
+                            onClick = {
+                                semesterMenuExpanded = true
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            val selectedSemester = semesters.firstOrNull {
+                                it.id == selectedSemesterId
+                            }
+
+                            Text(
+                                text = selectedSemester?.name
+                                    ?: "Sin semestre"
+                            )
+
+                            Spacer(modifier = Modifier.weight(1f))
+
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = semesterMenuExpanded,
+                            onDismissRequest = {
+                                semesterMenuExpanded = false
+                            }
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text("Sin semestre")
+                                },
+                                onClick = {
+                                    selectedSemesterId = null
+                                    semesterMenuExpanded = false
+                                }
+                            )
+
+                            semesters.forEach { semester ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(semester.name)
+                                    },
+                                    onClick = {
+                                        selectedSemesterId = semester.id
+                                        semesterMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    if (creationState is SubjectCreationState.Error) {
+                        Text(
+                            text = (creationState as SubjectCreationState.Error).message,
+                            color = Color.Red,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        subjectViewModel.createSubject(
+                            name = subjectName,
+                            description = subjectDescription,
+                            color = selectedColor,
+                            semesterId = selectedSemesterId
+                        )
+                    },
+                    enabled = creationState !is SubjectCreationState.Loading
+                            && subjectName.isNotBlank()
+                ) {
+                    Text(
+                        if (creationState is SubjectCreationState.Loading) {
+                            "Guardando..."
+                        } else {
+                            "Guardar"
+                        }
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showAddSubjectDialog = false
+                    }
+                ) {
+                    Text("Cancelar")
+                }
+            },
+            containerColor = LumiColors.White,
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
 }
