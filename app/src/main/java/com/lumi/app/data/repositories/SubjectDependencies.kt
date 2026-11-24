@@ -1,17 +1,10 @@
 package com.lumi.app.data.repositories
 
-import com.lumi.app.core.network.RetrofitClient
-import com.lumi.app.core.network.SubjectService
+import com.lumi.app.LumiApp
 
+/** Se conserva por compatibilidad: ahora el repositorio sale del AppContainer. */
 object SubjectDependencies {
 
-    private val subjectService: SubjectService by lazy {
-        RetrofitClient.retrofit.create(
-            SubjectService::class.java
-        )
-    }
-
-    val repository: SubjectRepository by lazy {
-        SubjectRepository(subjectService)
-    }
+    val repository: SubjectRepository
+        get() = LumiApp.container.subjectRepository
 }

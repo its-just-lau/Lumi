@@ -1,14 +1,11 @@
 package com.lumi.app.core.network
 
 import retrofit2.http.GET
-import retrofit2.http.Header
 
 interface SyncService {
 
     @GET("sync/state")
-    suspend fun getSyncState(
-        @Header("Authorization") authorization: String
-    ): SyncStateResponse
+    suspend fun getSyncState(): SyncStateResponse
 }
 
 data class SyncStateResponse(

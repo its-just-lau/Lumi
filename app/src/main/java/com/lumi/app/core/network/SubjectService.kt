@@ -3,6 +3,7 @@ package com.lumi.app.core.network
 import com.lumi.app.data.models.subjects.PageResponse
 import com.lumi.app.data.models.subjects.SemesterResponse
 import com.lumi.app.data.models.subjects.SubjectResponse
+import com.lumi.app.features.subjects.model.SemesterInput
 import com.lumi.app.features.subjects.model.SubjectInput
 
 import retrofit2.Response
@@ -21,7 +22,6 @@ interface SubjectService {
 
     @GET("semesters")
     suspend fun getSemesters(
-        @Header("Authorization") authorization: String,
         @Query("syncToken") syncToken: String? = null,
         @Query("syncRun") syncRun: String? = null,
         @Query("limit") limit: Int = 100,
@@ -29,12 +29,41 @@ interface SubjectService {
     ): PageResponse<SemesterResponse>
 
 
+    // Crear semestre
+    @POST("semesters")
+    suspend fun createSemester(
+        @Body semester: SemesterInput
+    ): SemesterResponse
+
+
+    // Consultar un semestre (devuelve el ETag)
+    @GET("semesters/{semesterId}")
+    suspend fun getSemester(
+        @Path("semesterId") semesterId: String
+    ): Response<SemesterResponse>
+
+
+    // Actualizar semestre
+    @PUT("semesters/{semesterId}")
+    suspend fun updateSemester(
+        @Path("semesterId") semesterId: String,
+        @Header("If-Match") etag: String,
+        @Body semester: SemesterInput
+    ): Response<SemesterResponse>
+
+
+    // Eliminar semestre (borrado lógico)
+    @DELETE("semesters/{semesterId}")
+    suspend fun deleteSemester(
+        @Path("semesterId") semesterId: String
+    ): Response<Unit>
+
+
     // SUBJECTS
 
     // Obtener todas las materias
     @GET("subjects")
     suspend fun getSubjects(
-        @Header("Authorization") authorization: String,
         @Query("syncToken") syncToken: String? = null,
         @Query("syncRun") syncRun: String? = null,
         @Query("limit") limit: Int = 100,
@@ -45,7 +74,6 @@ interface SubjectService {
     // Crear materia
     @POST("subjects")
     suspend fun createSubject(
-        @Header("Authorization") authorization: String,
         @Body subject: SubjectInput
     ): SubjectResponse
 
@@ -53,7 +81,6 @@ interface SubjectService {
     // Consultar una materia específica
     @GET("subjects/{subjectId}")
     suspend fun getSubject(
-        @Header("Authorization") authorization: String,
         @Path("subjectId") subjectId: String
     ): Response<SubjectResponse>
 
@@ -61,7 +88,6 @@ interface SubjectService {
     // Actualizar materia
     @PUT("subjects/{subjectId}")
     suspend fun updateSubject(
-        @Header("Authorization") authorization: String,
         @Path("subjectId") subjectId: String,
         @Header("If-Match") etag: String,
         @Body subject: SubjectInput
@@ -71,7 +97,6 @@ interface SubjectService {
     // Eliminar materia (borrado lógico)
     @DELETE("subjects/{subjectId}")
     suspend fun deleteSubject(
-        @Header("Authorization") authorization: String,
         @Path("subjectId") subjectId: String
     ): Response<Unit>
 }
