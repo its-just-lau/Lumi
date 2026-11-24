@@ -36,6 +36,14 @@ object LumiAnimations {
     val SERVER_ERROR: Int get() = R.raw.lumi_error_servidor
     val STREAK_ACTIVE: Int get() = R.raw.lumi_racha_activa
     val STREAK_NONE: Int get() = R.raw.lumi_sin_racha
+    val REST: Int get() = R.raw.lumi_reposo
+    val GLANCE: Int get() = R.raw.lumi_de_reojo
+    val TASK_DONE: Int get() = R.raw.lumi_tarea_completada
+    val STUDYING: Int get() = R.raw.lumi_estudiando
+    val BREAK: Int get() = R.raw.lumi_descanso
+    val SESSION_DONE: Int get() = R.raw.lumi_sesion_terminada
+    val QUIZ_DONE: Int get() = R.raw.lumi_cuestionario_terminado
+    val CARD_MISS: Int get() = R.raw.lumi_tarjeta_fallo
 
     /** Sin conexión para fallos de red; error del servidor para el resto. */
     fun forError(message: String): Int = when (message) {
@@ -120,4 +128,48 @@ fun StreakDialog(streakDays: Int, onDismiss: () -> Unit) {
             )
         }
     )
+}
+
+/** Diálogo breve de celebración con la mascota; se cierra solo tras [autoDismissMillis]. */
+@Composable
+fun MascotCelebration(
+    @RawRes animationRes: Int,
+    title: String,
+    onDismiss: () -> Unit,
+    autoDismissMillis: Long = 3000L
+) {
+    androidx.compose.runtime.LaunchedEffect(animationRes) {
+        kotlinx.coroutines.delay(autoDismissMillis)
+        onDismiss()
+    }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        androidx.compose.material3.Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = LumiColors.White
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                MascotAnimation(
+                    resId = animationRes,
+                    modifier = Modifier
+                        .height(260.dp)
+                        .aspectRatio(9f / 16f)
+                        .clip(RoundedCornerShape(18.dp))
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = LumiColors.Dark,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
 }

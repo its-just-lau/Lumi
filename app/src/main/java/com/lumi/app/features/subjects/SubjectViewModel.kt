@@ -3,14 +3,18 @@ package com.lumi.app.features.subjects
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lumi.app.core.network.toUserMessage
 import com.lumi.app.data.models.subjects.SemesterResponse
 import com.lumi.app.data.models.subjects.SubjectResponse
 import com.lumi.app.data.repositories.SubjectRepository
+import com.lumi.app.features.subjects.model.SemesterInput
 import com.lumi.app.features.subjects.model.SubjectInput
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.lumi.app.core.i18n.AppText
+import com.lumi.app.R
 
 sealed interface SubjectsUiState {
     data object Idle : SubjectsUiState
@@ -50,6 +54,13 @@ sealed interface SubjectOperationState {
     data class Error(val message: String) : SubjectOperationState
 }
 
+sealed interface SemesterOperationState {
+    data object Idle : SemesterOperationState
+    data object Loading : SemesterOperationState
+    data object Success : SemesterOperationState
+    data class Error(val message: String) : SemesterOperationState
+}
+
 class SubjectViewModel(
     private val repository: SubjectRepository
 ) : ViewModel() {
@@ -77,25 +88,32 @@ class SubjectViewModel(
     val operationState: StateFlow<SubjectOperationState> =
         _operationState.asStateFlow()
 
+    private val _semesterOperationState =
+        MutableStateFlow<SemesterOperationState>(SemesterOperationState.Idle)
+
+    val semesterOperationState: StateFlow<SemesterOperationState> =
+        _semesterOperationState.asStateFlow()
+
 
     // CARGAR MATERIAS Y SEMESTRES
 
     fun loadSubjects(
-        authorization: String = "Bearer lumi-mock-token"
     ) {
         viewModelScope.launch {
             _uiState.value = SubjectsUiState.Loading
 
             val semestersResult =
-                repository.getSemesters(authorization = authorization)
+                repository.getAllSemesters()
 
             val subjectsResult =
-                repository.getSubjects(authorization = authorization)
+                repository.getAllSubjects()
 
             if (semestersResult.isSuccess && subjectsResult.isSuccess) {
                 _uiState.value = SubjectsUiState.Success(
-                    subjects = subjectsResult.getOrThrow().items,
-                    semesters = semestersResult.getOrThrow().items
+                    subjects = subjectsResult.getOrThrow()
+                        .filter { it.deletedAt == null },
+                    semesters = semestersResult.getOrThrow()
+                        .filter { it.deletedAt == null }
                 )
             } else {
                 val exception =
@@ -103,8 +121,9 @@ class SubjectViewModel(
                         ?: subjectsResult.exceptionOrNull()
 
                 _uiState.value = SubjectsUiState.Error(
-                    exception?.message
-                        ?: "No se pudieron cargar las materias."
+                    exception?.toUserMessage(
+                        default = AppText.get(R.string.no_se_pudieron_cargar_las)
+                    ) ?: AppText.get(R.string.no_se_pudieron_cargar_las)
                 )
             }
         }
@@ -118,12 +137,11 @@ class SubjectViewModel(
         description: String? = null,
         color: String? = null,
         semesterId: String? = null,
-        authorization: String = "Bearer lumi-mock-token"
     ) {
         if (name.isBlank()) {
             _creationState.value =
                 SubjectCreationState.Error(
-                    "El nombre de la materia es obligatorio."
+                    AppText.get(R.string.el_nombre_de_la_materia)
                 )
             return
         }
@@ -141,7 +159,6 @@ class SubjectViewModel(
             )
 
             val result = repository.createSubject(
-                authorization = authorization,
                 subject = newSubject
             )
 
@@ -164,8 +181,9 @@ class SubjectViewModel(
             result.onFailure { error ->
                 _creationState.value =
                     SubjectCreationState.Error(
-                        error.message
-                            ?: "No se pudo registrar la materia."
+                        error.toUserMessage(
+                            default = AppText.get(R.string.no_se_pudo_registrar_la)
+                        )
                     )
             }
         }
@@ -176,13 +194,11 @@ class SubjectViewModel(
 
     fun loadSubject(
         subjectId: String,
-        authorization: String = "Bearer lumi-mock-token"
     ) {
         viewModelScope.launch {
             _detailState.value = SubjectDetailState.Loading
 
             val result = repository.getSubject(
-                authorization = authorization,
                 subjectId = subjectId
             )
 
@@ -192,9 +208,9 @@ class SubjectViewModel(
                     _detailState.value =
                         SubjectDetailState.Error(
                             when (response.code()) {
-                                404 -> "No se encontró la materia."
-                                410 -> "La materia fue eliminada."
-                                else -> "Error al consultar la materia: ${response.code()}"
+                                404 -> AppText.get(R.string.no_se_encontro_la_materia)
+                                410 -> AppText.get(R.string.la_materia_fue_eliminada)
+                                else -> AppText.get(R.string.error_al_consultar_la_materia, response.code())
                             }
                         )
                     return@onSuccess
@@ -205,7 +221,7 @@ class SubjectViewModel(
                 if (subject == null) {
                     _detailState.value =
                         SubjectDetailState.Error(
-                            "El servidor no devolvió los datos de la materia."
+                            AppText.get(R.string.el_servidor_no_devolvio_los)
                         )
                     return@onSuccess
                 }
@@ -215,7 +231,7 @@ class SubjectViewModel(
                 if (etag.isNullOrBlank()) {
                     _detailState.value =
                         SubjectDetailState.Error(
-                            "El servidor no devolvió el ETag de la materia."
+                            AppText.get(R.string.el_servidor_no_devolvio_el)
                         )
                     return@onSuccess
                 }
@@ -230,8 +246,9 @@ class SubjectViewModel(
             result.onFailure { error ->
                 _detailState.value =
                     SubjectDetailState.Error(
-                        error.message
-                            ?: "No se pudo consultar la materia."
+                        error.toUserMessage(
+                            default = AppText.get(R.string.no_se_pudo_consultar_la)
+                        )
                     )
             }
         }
@@ -247,7 +264,6 @@ class SubjectViewModel(
         color: String? = null,
         semesterId: String? = null,
         status: String = "active",
-        authorization: String = "Bearer lumi-mock-token"
     ) {
         val detail = _detailState.value
 
@@ -256,7 +272,7 @@ class SubjectViewModel(
         ) {
             _operationState.value =
                 SubjectOperationState.Error(
-                    "Primero debes consultar la materia para obtener su ETag."
+                    AppText.get(R.string.primero_debes_consultar_la_materia)
                 )
             return
         }
@@ -264,7 +280,7 @@ class SubjectViewModel(
         if (name.isBlank()) {
             _operationState.value =
                 SubjectOperationState.Error(
-                    "El nombre de la materia es obligatorio."
+                    AppText.get(R.string.el_nombre_de_la_materia)
                 )
             return
         }
@@ -282,7 +298,6 @@ class SubjectViewModel(
             )
 
             val result = repository.updateSubject(
-                authorization = authorization,
                 subjectId = subjectId,
                 etag = detail.etag,
                 subject = updatedSubject
@@ -294,12 +309,18 @@ class SubjectViewModel(
                     _operationState.value =
                         SubjectOperationState.Error(
                             when (response.code()) {
-                                409 -> "La materia fue modificada en otro dispositivo. Consulta nuevamente antes de actualizar."
-                                404 -> "No se encontró la materia."
-                                410 -> "La materia fue eliminada."
-                                else -> "Error al actualizar la materia: ${response.code()}"
+                                409 -> AppText.get(R.string.esta_materia_cambio_en_otro)
+                                404 -> AppText.get(R.string.no_se_encontro_la_materia)
+                                410 -> AppText.get(R.string.la_materia_fue_eliminada)
+                                else -> AppText.get(R.string.error_al_actualizar_la_materia, response.code())
                             }
                         )
+
+                    // Conflicto: vuelve a consultar para obtener el ETag vigente.
+                    if (response.code() == 409) {
+                        loadSubject(subjectId)
+                    }
+
                     return@onSuccess
                 }
 
@@ -308,7 +329,7 @@ class SubjectViewModel(
                 if (updatedResponse == null) {
                     _operationState.value =
                         SubjectOperationState.Error(
-                            "La actualización fue aceptada, pero el servidor no devolvió la materia. Consulta nuevamente para verificarla."
+                            AppText.get(R.string.la_actualizacion_fue_aceptada_pero)
                         )
                     return@onSuccess
                 }
@@ -336,8 +357,9 @@ class SubjectViewModel(
             result.onFailure { error ->
                 _operationState.value =
                     SubjectOperationState.Error(
-                        error.message
-                            ?: "No se pudo actualizar la materia."
+                        error.toUserMessage(
+                            default = AppText.get(R.string.no_se_pudo_actualizar_la)
+                        )
                     )
             }
         }
@@ -348,13 +370,11 @@ class SubjectViewModel(
 
     fun deleteSubject(
         subjectId: String,
-        authorization: String = "Bearer lumi-mock-token"
     ) {
         viewModelScope.launch {
             _operationState.value = SubjectOperationState.Loading
 
             val result = repository.deleteSubject(
-                authorization = authorization,
                 subjectId = subjectId
             )
 
@@ -364,9 +384,9 @@ class SubjectViewModel(
                     _operationState.value =
                         SubjectOperationState.Error(
                             when (response.code()) {
-                                404 -> "No se encontró la materia."
-                                410 -> "La materia ya fue eliminada."
-                                else -> "Error al eliminar la materia: ${response.code()}"
+                                404 -> AppText.get(R.string.no_se_encontro_la_materia)
+                                410 -> AppText.get(R.string.la_materia_ya_fue_eliminada)
+                                else -> AppText.get(R.string.error_al_eliminar_la_materia, response.code())
                             }
                         )
                     return@onSuccess
@@ -398,8 +418,201 @@ class SubjectViewModel(
             result.onFailure { error ->
                 _operationState.value =
                     SubjectOperationState.Error(
-                        error.message
-                            ?: "No se pudo eliminar la materia."
+                        error.toUserMessage(
+                            default = AppText.get(R.string.no_se_pudo_eliminar_la)
+                        )
+                    )
+            }
+        }
+    }
+
+
+    // CREAR SEMESTRE
+
+    fun createSemester(name: String) {
+        if (name.isBlank()) {
+            _semesterOperationState.value =
+                SemesterOperationState.Error(
+                    AppText.get(R.string.el_nombre_del_semestre_es)
+                )
+            return
+        }
+
+        viewModelScope.launch {
+            _semesterOperationState.value = SemesterOperationState.Loading
+
+            val input = SemesterInput(
+                id = java.util.UUID.randomUUID().toString(),
+                name = name.trim()
+            )
+
+            val result = repository.createSemester(input)
+
+            result.onSuccess { created ->
+                val currentState = _uiState.value
+
+                if (currentState is SubjectsUiState.Success) {
+                    _uiState.value = currentState.copy(
+                        semesters = currentState.semesters
+                            .filterNot { it.id == created.id } + created
+                    )
+                }
+
+                _semesterOperationState.value = SemesterOperationState.Success
+            }
+
+            result.onFailure { error ->
+                _semesterOperationState.value =
+                    SemesterOperationState.Error(
+                        error.toUserMessage(
+                            default = AppText.get(R.string.no_se_pudo_crear_el_2)
+                        )
+                    )
+            }
+        }
+    }
+
+
+    // RENOMBRAR SEMESTRE (consulta primero para obtener el ETag y conservar sus fechas)
+
+    fun renameSemester(semesterId: String, name: String) {
+        if (name.isBlank()) {
+            _semesterOperationState.value =
+                SemesterOperationState.Error(
+                    AppText.get(R.string.el_nombre_del_semestre_es)
+                )
+            return
+        }
+
+        viewModelScope.launch {
+            _semesterOperationState.value = SemesterOperationState.Loading
+
+            val current = repository.getSemester(semesterId).getOrElse { error ->
+                _semesterOperationState.value =
+                    SemesterOperationState.Error(
+                        error.toUserMessage(
+                            default = AppText.get(R.string.no_se_pudo_consultar_el)
+                        )
+                    )
+                return@launch
+            }
+
+            val semester = current.body()
+            val etag = current.headers()["ETag"]
+
+            if (!current.isSuccessful || semester == null || etag.isNullOrBlank()) {
+                _semesterOperationState.value =
+                    SemesterOperationState.Error(
+                        if (current.code() == 404 || current.code() == 410) {
+                            AppText.get(R.string.este_semestre_ya_no_existe)
+                        } else {
+                            AppText.get(R.string.no_se_pudo_consultar_el)
+                        }
+                    )
+                return@launch
+            }
+
+            val input = SemesterInput(
+                id = semesterId,
+                name = name.trim(),
+                startDate = semester.startDate,
+                endDate = semester.endDate
+            )
+
+            val result = repository.updateSemester(semesterId, etag, input)
+
+            result.onSuccess { response ->
+                val updated = response.body()
+
+                if (!response.isSuccessful || updated == null) {
+                    _semesterOperationState.value =
+                        SemesterOperationState.Error(
+                            if (response.code() == 409) {
+                                AppText.get(R.string.este_semestre_cambio_en_otro)
+                            } else {
+                                AppText.get(R.string.no_se_pudo_actualizar_el)
+                            }
+                        )
+                    return@onSuccess
+                }
+
+                val currentState = _uiState.value
+
+                if (currentState is SubjectsUiState.Success) {
+                    _uiState.value = currentState.copy(
+                        semesters = currentState.semesters.map {
+                            if (it.id == semesterId) updated else it
+                        }
+                    )
+                }
+
+                _semesterOperationState.value = SemesterOperationState.Success
+            }
+
+            result.onFailure { error ->
+                _semesterOperationState.value =
+                    SemesterOperationState.Error(
+                        error.toUserMessage(
+                            default = AppText.get(R.string.no_se_pudo_actualizar_el)
+                        )
+                    )
+            }
+        }
+    }
+
+
+    // ELIMINAR SEMESTRE
+
+    fun deleteSemester(semesterId: String) {
+        val currentState = _uiState.value
+
+        // El contrato no permite borrar un semestre que todavía tiene materias.
+        if (currentState is SubjectsUiState.Success &&
+            currentState.subjects.any { it.semesterId == semesterId }
+        ) {
+            _semesterOperationState.value =
+                SemesterOperationState.Error(
+                    AppText.get(R.string.este_semestre_todavia_tiene_materias)
+                )
+            return
+        }
+
+        viewModelScope.launch {
+            _semesterOperationState.value = SemesterOperationState.Loading
+
+            val result = repository.deleteSemester(semesterId)
+
+            result.onSuccess { response ->
+                if (!response.isSuccessful) {
+                    _semesterOperationState.value =
+                        SemesterOperationState.Error(
+                            when (response.code()) {
+                                404, 410 -> AppText.get(R.string.este_semestre_ya_fue_eliminado)
+                                409 -> AppText.get(R.string.este_semestre_todavia_tiene_materias_2)
+                                else -> AppText.get(R.string.no_se_pudo_eliminar_el_2)
+                            }
+                        )
+                    return@onSuccess
+                }
+
+                val latestState = _uiState.value
+
+                if (latestState is SubjectsUiState.Success) {
+                    _uiState.value = latestState.copy(
+                        semesters = latestState.semesters
+                            .filterNot { it.id == semesterId }
+                    )
+                }
+
+                _semesterOperationState.value = SemesterOperationState.Success
+            }
+
+            result.onFailure { error ->
+                _semesterOperationState.value =
+                    SemesterOperationState.Error(
+                        error.toUserMessage(
+                            default = AppText.get(R.string.no_se_pudo_eliminar_el_2)
+                        )
                     )
             }
         }
@@ -422,5 +635,9 @@ class SubjectViewModel(
 
     fun resetOperationState() {
         _operationState.value = SubjectOperationState.Idle
+    }
+
+    fun resetSemesterOperationState() {
+        _semesterOperationState.value = SemesterOperationState.Idle
     }
 }

@@ -16,6 +16,8 @@ import androidx.compose.ui.text.font.FontWeight
 import com.lumi.app.core.components.LumiCard
 import com.lumi.app.features.subjects.model.Subject
 import com.lumi.app.ui.theme.LumiColors
+import androidx.compose.ui.res.stringResource
+import com.lumi.app.R
 
 @Composable
 fun SubjectCard(
@@ -44,9 +46,9 @@ fun SubjectCard(
 
         Text(
             text = when {
-                isDraft -> "Borrador"
-                subject.semesterId == null -> "Aprendizaje personal"
-                else -> semesterName ?: "Materia"
+                isDraft -> stringResource(R.string.borrador)
+                subject.semesterId == null -> stringResource(R.string.aprendizaje_personal)
+                else -> semesterName ?: stringResource(R.string.materia)
             },
             fontSize = 11.sp,
             color = Color.Gray
@@ -60,7 +62,7 @@ fun SubjectCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Progreso",
+                    text = stringResource(R.string.progreso),
                     fontSize = 11.sp,
                     color = LumiColors.Dark
                 )
@@ -87,7 +89,7 @@ fun SubjectCard(
             )
         } else {
             Text(
-                text = "Completa su configuración",
+                text = stringResource(R.string.completa_su_configuracion),
                 fontSize = 11.sp,
                 color = LumiColors.Dark
             )

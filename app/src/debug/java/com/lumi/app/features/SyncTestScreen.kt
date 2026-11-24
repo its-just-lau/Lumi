@@ -5,7 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.lumi.app.core.network.RetrofitClient
+import com.lumi.app.LumiApp
 import com.lumi.app.core.network.SyncService
 import kotlinx.coroutines.launch
 
@@ -34,12 +34,10 @@ fun SyncTestScreen() {
                     result = "Conectando con Prism..."
 
                     try {
-                        val service = RetrofitClient.retrofit
+                        val service = LumiApp.container.retrofit
                             .create(SyncService::class.java)
 
-                        val response = service.getSyncState(
-                            authorization = "Bearer lumi-mock-token"
-                        )
+                        val response = service.getSyncState()
 
                         result = """
                             ¡Conexión exitosa!

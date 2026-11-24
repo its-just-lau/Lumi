@@ -1,5 +1,6 @@
 package com.lumi.app.features.profile
 
+import com.lumi.app.core.components.LumiEmoji
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Notifications
@@ -20,43 +22,65 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.lumi.app.LumiApp
 import com.lumi.app.core.components.LumiBottomBar
+import com.lumi.app.core.components.SkeletonBox
 import com.lumi.app.ui.theme.LumiColors
+import androidx.compose.ui.res.stringResource
+import com.lumi.app.R
 
 private data class ProfileAvatar(
     val emoji: String,
-    val label: String
+    @androidx.annotation.StringRes val label: Int
 )
 
 @Composable
 fun ProfileScreen(
     onNavigate: (String) -> Unit
 ) {
-    // Datos provisionales: posteriormente se obtendrán del perfil y del progreso real.
-    val userName = "Laura Chávez"
-    val memberSince = "Miembro desde 2026"
-    val currentStreak = 20
-    val totalXp = 77452
-    val activeSubjects = 5
-    val gems = 853
-    val totalStudyHours = 86
-    val completedLessons = 42
-    val completedTasks = 68
+    val container = LumiApp.container
+
+    val profileViewModel: ProfileViewModel = viewModel(
+        factory = ProfileViewModelFactory(
+            container.userRepository,
+            container.progressRepository,
+            container.subjectRepository,
+            container.taskRepository
+        )
+    )
+    val profile by profileViewModel.data.collectAsState()
+
+    LaunchedEffect(Unit) {
+        profileViewModel.load()
+    }
+
+    val userName = profile.name
+    val memberSince = profile.email
+    val currentStreak = profile.streakDays
+    val totalXp = profile.totalXp
+    val activeSubjects = profile.activeSubjects
+    val gems = profile.gems
+    val totalStudyHours = profile.studyHours
+    val completedLessons = profile.completedLessons
+    val completedTasks = profile.completedTasks
 
     val avatars = listOf(
-        ProfileAvatar("👩🏻‍💻", "Estudiante"),
-        ProfileAvatar("🦎", "Lumi"),
-        ProfileAvatar("📚", "Lectura"),
-        ProfileAvatar("🧑🏽‍🎓", "Graduación"),
-        ProfileAvatar("🐱", "Gatito"),
-        ProfileAvatar("🦊", "Zorrito"),
-        ProfileAvatar("🌻", "Girasol"),
-        ProfileAvatar("🚀", "Explorador")
+        ProfileAvatar("👩🏻‍💻", R.string.avatar_student),
+        ProfileAvatar("🦎", R.string.avatar_lumi),
+        ProfileAvatar("📚", R.string.avatar_reading),
+        ProfileAvatar("🧑🏽‍🎓", R.string.avatar_graduation),
+        ProfileAvatar("🐱", R.string.avatar_kitten),
+        ProfileAvatar("🦊", R.string.avatar_fox),
+        ProfileAvatar("🌻", R.string.avatar_sunflower),
+        ProfileAvatar("🚀", R.string.avatar_explorer)
     )
 
     var selectedAvatar by remember { mutableStateOf(avatars.first()) }
@@ -93,7 +117,7 @@ fun ProfileScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
-                        contentDescription = "Configuración",
+                        contentDescription = stringResource(R.string.configuracion),
                         tint = LumiColors.Dark
                     )
                 }
@@ -104,29 +128,35 @@ fun ProfileScreen(
                         .padding(top = 52.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(104.dp)
-                            .clip(CircleShape)
-                            .background(LumiColors.Yellow)
-                            .clickable { showAvatarPicker = true },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = selectedAvatar.emoji,
-                            fontSize = 55.sp
-                        )
+                    Box(modifier = Modifier.size(104.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                                .background(LumiColors.Yellow)
+                                .clickable { showAvatarPicker = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = selectedAvatar.emoji,
+                                fontSize = 55.sp
+                            )
+                        }
+
+                        // La insignia va fuera del círculo recortado para que no se corte
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
-                                .size(30.dp)
+                                .size(32.dp)
+                                .shadow(2.dp, CircleShape)
                                 .clip(CircleShape)
-                                .background(LumiColors.White),
+                                .background(LumiColors.White)
+                                .clickable { showAvatarPicker = true },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Edit,
-                                contentDescription = "Cambiar foto de perfil",
+                                contentDescription = stringResource(R.string.cambiar_foto_de_perfil),
                                 tint = LumiColors.Dark,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -135,24 +165,38 @@ fun ProfileScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    Text(
-                        text = userName,
-                        fontSize = 23.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = LumiColors.Dark
-                    )
-                    Text(
-                        text = memberSince,
-                        fontSize = 13.sp,
-                        color = LumiColors.Dark.copy(alpha = 0.7f)
-                    )
+                    if (userName.isBlank()) {
+                        SkeletonBox(
+                            modifier = Modifier
+                                .width(150.dp)
+                                .height(24.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        SkeletonBox(
+                            modifier = Modifier
+                                .width(110.dp)
+                                .height(14.dp)
+                        )
+                    } else {
+                        Text(
+                            text = userName,
+                            fontSize = 23.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = LumiColors.Dark
+                        )
+                        Text(
+                            text = memberSince,
+                            fontSize = 13.sp,
+                            color = LumiColors.Dark.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
 
             // RESUMEN
             Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
                 Text(
-                    text = "Resumen",
+                    text = stringResource(R.string.resumen),
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
                     color = LumiColors.Dark
@@ -164,15 +208,15 @@ fun ProfileScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         ProfileStatCard(
-                            emoji = "🔥",
+                            emoji = if (currentStreak > 0) "🔥" else "lumi:FlameOff",
                             value = currentStreak.toString(),
-                            label = "Días de racha",
+                            label = stringResource(R.string.dias_de_racha_2),
                             modifier = Modifier.weight(1f)
                         )
                         ProfileStatCard(
                             emoji = "⭐",
                             value = "%,d".format(totalXp),
-                            label = "XP totales",
+                            label = stringResource(R.string.xp_totales),
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -183,13 +227,13 @@ fun ProfileScreen(
                         ProfileStatCard(
                             emoji = "📚",
                             value = activeSubjects.toString(),
-                            label = "Materias activas",
+                            label = stringResource(R.string.materias_activas),
                             modifier = Modifier.weight(1f)
                         )
                         ProfileStatCard(
                             emoji = "💎",
                             value = "%,d".format(gems),
-                            label = "Gemas",
+                            label = stringResource(R.string.gemas),
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -199,7 +243,7 @@ fun ProfileScreen(
             // PROGRESO ACADÉMICO
             Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
                 Text(
-                    text = "Mi progreso",
+                    text = stringResource(R.string.mi_progreso),
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
                     color = LumiColors.Dark
@@ -218,19 +262,19 @@ fun ProfileScreen(
                     ) {
                         ProfileProgressRow(
                             emoji = "⏱️",
-                            label = "Tiempo de estudio",
+                            label = stringResource(R.string.tiempo_de_estudio),
                             value = "$totalStudyHours horas"
                         )
                         HorizontalDivider(color = LumiColors.WarmGray)
                         ProfileProgressRow(
                             emoji = "📖",
-                            label = "Lecciones completadas",
+                            label = stringResource(R.string.lecciones_completadas),
                             value = completedLessons.toString()
                         )
                         HorizontalDivider(color = LumiColors.WarmGray)
                         ProfileProgressRow(
                             emoji = "☑️",
-                            label = "Tareas finalizadas",
+                            label = stringResource(R.string.tareas_finalizadas),
                             value = completedTasks.toString()
                         )
                     }
@@ -240,7 +284,7 @@ fun ProfileScreen(
             // ACTIVIDAD SEMANAL: VISUAL DE EJEMPLO
             Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
                 Text(
-                    text = "Actividad semanal",
+                    text = stringResource(R.string.actividad_semanal),
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
                     color = LumiColors.Dark
@@ -258,12 +302,16 @@ fun ProfileScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "Tu constancia de los últimos 7 días",
+                            text = stringResource(R.string.tu_constancia_de_los_ultimos),
                             fontSize = 12.sp,
                             color = LumiColors.Dark.copy(alpha = 0.7f)
                         )
                         val dayLabels = listOf("L", "M", "M", "J", "V", "S", "D")
-                        val activity = listOf(0.75f, 0.45f, 0.9f, 0.6f, 1f, 0.3f, 0.7f)
+                        // Barras proporcionales al día con más minutos de la semana
+                        val maxMinutes = (profile.weeklyMinutes.maxOrNull() ?: 0).coerceAtLeast(1)
+                        val activity = profile.weeklyMinutes.map {
+                            (it.toFloat() / maxMinutes).coerceIn(0.04f, 1f)
+                        }
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -305,7 +353,7 @@ fun ProfileScreen(
             // LOGROS
             Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
                 Text(
-                    text = "Logros",
+                    text = stringResource(R.string.logros),
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
                     color = LumiColors.Dark
@@ -317,49 +365,26 @@ fun ProfileScreen(
                 ) {
                     AchievementItem(
                         emoji = "🌱",
-                        title = "Primeros pasos",
-                        subtitle = "Primera lección",
+                        title = stringResource(R.string.primeros_pasos),
+                        subtitle = stringResource(R.string.primera_leccion),
+                        unlocked = completedLessons >= 1,
                         modifier = Modifier.weight(1f)
                     )
                     AchievementItem(
                         emoji = "🔥",
-                        title = "Constancia",
-                        subtitle = "Racha de 7 días",
+                        title = stringResource(R.string.constancia),
+                        subtitle = stringResource(R.string.racha_de_7_dias),
+                        unlocked = currentStreak >= 7,
                         modifier = Modifier.weight(1f)
                     )
                     AchievementItem(
                         emoji = "🏆",
-                        title = "Estudioso",
-                        subtitle = "50 lecciones",
+                        title = stringResource(R.string.estudioso),
+                        subtitle = stringResource(R.string.s_50_lecciones),
+                        unlocked = completedLessons >= 50,
                         modifier = Modifier.weight(1f)
                     )
                 }
-            }
-
-            // OPCIONES
-            Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                Text(
-                    text = "Cuenta",
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = LumiColors.Dark
-                )
-
-                ProfileOptionRow(
-                    icon = { Icon(Icons.Default.Person, contentDescription = null) },
-                    title = "Editar información",
-                    onClick = { onNavigate("edit-profile") }
-                )
-                ProfileOptionRow(
-                    icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
-                    title = "Notificaciones",
-                    onClick = { onNavigate("notifications") }
-                )
-                ProfileOptionRow(
-                    icon = { Icon(Icons.Default.Security, contentDescription = null) },
-                    title = "Privacidad y cuenta",
-                    onClick = { onNavigate("settings") }
-                )
             }
 
             Spacer(modifier = Modifier.height(6.dp))
@@ -372,7 +397,7 @@ fun ProfileScreen(
             containerColor = LumiColors.White,
             title = {
                 Text(
-                    text = "Elige tu foto de perfil",
+                    text = stringResource(R.string.elige_tu_foto_de_perfil),
                     fontWeight = FontWeight.Bold,
                     color = LumiColors.Dark
                 )
@@ -380,7 +405,7 @@ fun ProfileScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "Selecciona una de las opciones de Lumi.",
+                        text = stringResource(R.string.selecciona_una_de_las_opciones),
                         fontSize = 13.sp,
                         color = LumiColors.Dark.copy(alpha = 0.7f)
                     )
@@ -407,7 +432,7 @@ fun ProfileScreen(
                                 ) {
                                     Text(avatar.emoji, fontSize = 30.sp)
                                     Text(
-                                        text = avatar.label,
+                                        text = stringResource(avatar.label),
                                         fontSize = 10.sp,
                                         color = LumiColors.Dark,
                                         textAlign = TextAlign.Center
@@ -420,7 +445,7 @@ fun ProfileScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showAvatarPicker = false }) {
-                    Text("Cerrar", color = LumiColors.YellowStrong)
+                    Text(stringResource(R.string.cerrar), color = LumiColors.YellowStrong)
                 }
             }
         )
@@ -445,7 +470,7 @@ private fun ProfileStatCard(
                 .padding(horizontal = 12.dp, vertical = 15.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(emoji, fontSize = 25.sp)
+            LumiEmoji(emoji, size = 29.dp)
             Spacer(modifier = Modifier.width(9.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -474,7 +499,7 @@ private fun ProfileProgressRow(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(emoji, fontSize = 23.sp)
+        LumiEmoji(emoji, size = 26.dp)
         Spacer(modifier = Modifier.width(11.dp))
         Text(
             text = label,
@@ -496,10 +521,11 @@ private fun AchievementItem(
     emoji: String,
     title: String,
     subtitle: String,
+    unlocked: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier,
+        modifier = modifier.alpha(if (unlocked) 1f else 0.45f),
         shape = RoundedCornerShape(17.dp),
         colors = CardDefaults.cardColors(containerColor = LumiColors.White)
     ) {
@@ -509,7 +535,7 @@ private fun AchievementItem(
                 .padding(vertical = 13.dp, horizontal = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(emoji, fontSize = 31.sp)
+            LumiEmoji(emoji, size = 36.dp)
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = title,
@@ -523,47 +549,6 @@ private fun AchievementItem(
                 fontSize = 9.sp,
                 color = LumiColors.Dark.copy(alpha = 0.65f),
                 textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-@Composable
-private fun ProfileOptionRow(
-    icon: @Composable () -> Unit,
-    title: String,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = LumiColors.White)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 15.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            CompositionLocalProvider(
-                LocalContentColor provides LumiColors.Dark
-            ) {
-                icon()
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = title,
-                modifier = Modifier.weight(1f),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = LumiColors.Dark
-            )
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = LumiColors.Dark.copy(alpha = 0.6f)
             )
         }
     }

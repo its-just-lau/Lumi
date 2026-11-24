@@ -1,5 +1,8 @@
 package com.lumi.app.features.store
 
+import com.lumi.app.core.components.LumiEmoji
+import com.lumi.app.core.components.LumiIcon
+import com.lumi.app.core.components.LumiIconKind
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,15 +20,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.lumi.app.LumiApp
 import com.lumi.app.core.components.LumiBottomBar
+import com.lumi.app.core.components.SkeletonList
+import com.lumi.app.data.models.store.StoreItemResponse
 import com.lumi.app.ui.theme.LumiColors
+import androidx.compose.ui.res.stringResource
+import com.lumi.app.R
+import com.lumi.app.core.i18n.AppText
 
 private data class StoreOffer(
     val emoji: String,
     val title: String,
     val description: String,
     val price: Int? = null,
-    val status: String? = null
+    val status: String? = null,
+    // Id del artículo en el catálogo del servidor (null en ofertas informativas)
+    val itemId: String? = null
 )
 
 private data class GemPack(
@@ -38,10 +52,31 @@ private data class GemPack(
 fun StoreScreen(
     onNavigate: (String) -> Unit
 ) {
-    // Datos de demostración. Después se conectarán al inventario y al backend.
-    var gems by remember { mutableIntStateOf(853) }
-    var equippedProtector by remember { mutableIntStateOf(2) }
-    var purchasedItems by remember { mutableStateOf(setOf<String>()) }
+    val context = LocalContext.current
+
+    val storeViewModel: StoreViewModel = viewModel(
+        factory = StoreViewModelFactory(
+            LumiApp.container.storeRepository,
+            LumiApp.container.progressRepository
+        )
+    )
+    val store by storeViewModel.data.collectAsState()
+    val buying by storeViewModel.buying.collectAsState()
+    val storeMessage by storeViewModel.message.collectAsState()
+
+    LaunchedEffect(Unit) {
+        storeViewModel.load()
+    }
+
+    LaunchedEffect(storeMessage) {
+        storeMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            storeViewModel.consumeMessage()
+        }
+    }
+
+    val gems = store.gems
+
     var selectedOffer by remember { mutableStateOf<StoreOffer?>(null) }
     var promoCode by remember { mutableStateOf("") }
     var promoMessage by remember { mutableStateOf<String?>(null) }
@@ -49,48 +84,38 @@ fun StoreScreen(
     val specialOffers = listOf(
         StoreOffer(
             "🌅",
-            "Recompensa de estudio matutino",
-            "Completa una lección entre las 6 a.m. y el mediodía para obtener esta recompensa.",
+            AppText.get(R.string.recompensa_de_estudio_matutino),
+            AppText.get(R.string.completa_una_leccion_entre_las),
             status = "DISPONIBLE"
         ),
         StoreOffer(
             "🌙",
-            "Recompensa de estudio nocturno",
-            "Completa una lección entre las 6 p.m. y la medianoche para obtener esta recompensa.",
+            AppText.get(R.string.recompensa_de_estudio_nocturno),
+            AppText.get(R.string.completa_una_leccion_entre_las_2),
             status = "DISPONIBLE"
         )
     )
 
-    val streakItems = listOf(
+    // Catálogo real del servidor, separado por tipo de artículo
+    val catalogOffers = store.items.map { item ->
+        val owned = store.inventory[item.id] ?: 0
         StoreOffer(
-            "🛡️",
-            "Protector de racha",
-            "Protege tu racha si no puedes estudiar por un día. Puedes equipar hasta 2 a la vez.",
-            450,
-            "$equippedProtector / 2 EQUIPADOS"
-        )
-    )
+            emoji = storeEmoji(item),
+            title = item.name,
+            description = item.description.orEmpty(),
+            price = item.priceGems,
+            status = if (owned > 0) stringResource(R.string.en_inventario, owned) else null,
+            itemId = item.id
+        ) to item
+    }
 
-    val boosters = listOf(
-        StoreOffer(
-            "🧪",
-            "Multiplicador de XP",
-            "Gana el triple de XP en tus lecciones.",
-            500,
-            "RECIBE TU RECOMPENSA"
-        ),
-        StoreOffer(
-            "⏱️",
-            "Tiempo extra",
-            "Agrega tiempo adicional para completar tus desafíos.",
-            450
-        )
-    )
+    val streakItems = catalogOffers.filter { isStreakItem(it.second) }.map { it.first }
+    val boosters = catalogOffers.filterNot { isStreakItem(it.second) }.map { it.first }
 
     val gemPacks = listOf(
-        GemPack("💰", "1,200", "$119.00"),
-        GemPack("💎", "3,000", "$235.00"),
-        GemPack("🪙", "6,500", "$469.00")
+        GemPack("lumi:GemsPile", "1,200", "$119.00"),
+        GemPack("lumi:GemsBag", "3,000", "$235.00"),
+        GemPack("lumi:GemsChest", "6,500", "$469.00")
     )
 
     Scaffold(
@@ -118,13 +143,13 @@ fun StoreScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Tienda",
+                    text = stringResource(R.string.tienda),
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
                     color = LumiColors.Dark
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("💎", fontSize = 20.sp)
+                    LumiIcon(LumiIconKind.Gem, size = 24.dp)
                     Spacer(modifier = Modifier.width(5.dp))
                     Text(
                         text = gems.toString(),
@@ -137,7 +162,7 @@ fun StoreScreen(
 
             // OFERTAS ESPECIALES
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                StoreSectionHeading("Ofertas especiales")
+                StoreSectionHeading(stringResource(R.string.ofertas_especiales))
                 specialOffers.forEach { offer ->
                     SpecialOfferCard(offer = offer)
                 }
@@ -145,7 +170,8 @@ fun StoreScreen(
 
             // DÍAS DE RACHA
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                StoreSectionHeading("Días de racha")
+                StoreSectionHeading(stringResource(R.string.dias_de_racha_2))
+                if (streakItems.isEmpty()) EmptyStoreText(store.loaded)
                 streakItems.forEach { offer ->
                     StoreItemRow(
                         offer = offer,
@@ -156,15 +182,17 @@ fun StoreScreen(
 
             // GEMAS
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                StoreSectionHeading("Gemas")
+                StoreSectionHeading(stringResource(R.string.gemas))
                 gemPacks.forEach { pack ->
+                    val packTitle = stringResource(R.string.gemas_2, pack.amount)
+                    val packDescription = stringResource(R.string.paquete_de_gemas_por_la, pack.amount, pack.price)
                     GemPackRow(
                         pack = pack,
                         onClick = {
                             selectedOffer = StoreOffer(
                                 emoji = pack.emoji,
-                                title = "${pack.amount} gemas",
-                                description = "Paquete de ${pack.amount} gemas por ${pack.price}. La compra real se habilitará más adelante."
+                                title = packTitle,
+                                description = packDescription
                             )
                         }
                     )
@@ -173,7 +201,8 @@ fun StoreScreen(
 
             // POTENCIADORES
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                StoreSectionHeading("Potenciadores")
+                StoreSectionHeading(stringResource(R.string.potenciadores))
+                if (boosters.isEmpty()) EmptyStoreText(store.loaded)
                 boosters.forEach { offer ->
                     StoreItemRow(
                         offer = offer,
@@ -184,7 +213,7 @@ fun StoreScreen(
 
             // CÓDIGO PROMOCIONAL
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                StoreSectionHeading("Código promocional")
+                StoreSectionHeading(stringResource(R.string.codigo_promocional))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp),
@@ -196,17 +225,17 @@ fun StoreScreen(
                             .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("🎟️", fontSize = 36.sp)
+                        LumiEmoji("🎟️", size = 42.dp)
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "Ingresa un código promocional",
+                                AppText.get(R.string.ingresa_un_codigo_promocional),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp,
                                 color = LumiColors.Dark
                             )
                             Text(
-                                "Canjea un código y recibe recompensas.",
+                                AppText.get(R.string.canjea_un_codigo_y_recibe),
                                 fontSize = 11.sp,
                                 color = LumiColors.Dark.copy(alpha = 0.7f)
                             )
@@ -219,15 +248,15 @@ fun StoreScreen(
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
-                                placeholder = { Text("Código promocional") },
+                                placeholder = { Text(stringResource(R.string.codigo_promocional)) },
                                 shape = RoundedCornerShape(12.dp)
                             )
                             TextButton(
                                 onClick = {
                                     promoMessage = if (promoCode.isBlank()) {
-                                        "Escribe un código para continuar."
+                                        AppText.get(R.string.escribe_un_codigo_para_continuar)
                                     } else {
-                                        "El canje de códigos estará disponible próximamente."
+                                        AppText.get(R.string.el_canje_de_codigos_estara)
                                     }
                                 },
                                 contentPadding = PaddingValues(0.dp)
@@ -266,7 +295,7 @@ fun StoreScreen(
                 Text(
                     text = buildString {
                         append(offer.description)
-                        offer.price?.let { append("\\n\\nPrecio: 💎 $it") }
+                        offer.price?.let { append(AppText.get(R.string.n_nprecio_gemas, it)) }
                     },
                     color = LumiColors.Dark
                 )
@@ -274,20 +303,17 @@ fun StoreScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val price = offer.price
-                        if (price != null && gems >= price) {
-                            gems -= price
-                            purchasedItems = purchasedItems + offer.title
-                            if (offer.title == "Protector de racha" && equippedProtector < 2) {
-                                equippedProtector++
-                            }
+                        val purchasable = store.items.firstOrNull { it.id == offer.itemId }
+                        if (purchasable != null && gems >= purchasable.priceGems) {
+                            storeViewModel.purchase(purchasable)
                         }
                         selectedOffer = null
                     },
-                    enabled = offer.price == null || gems >= offer.price
+                    enabled = offer.itemId == null ||
+                            (!buying && offer.price != null && gems >= offer.price)
                 ) {
                     Text(
-                        if (offer.price == null) "Entendido" else "Canjear",
+                        if (offer.itemId == null) stringResource(R.string.entendido) else stringResource(R.string.canjear),
                         color = LumiColors.YellowStrong,
                         fontWeight = FontWeight.Bold
                     )
@@ -295,7 +321,7 @@ fun StoreScreen(
             },
             dismissButton = {
                 TextButton(onClick = { selectedOffer = null }) {
-                    Text("Cerrar", color = LumiColors.Dark)
+                    Text(stringResource(R.string.cerrar), color = LumiColors.Dark)
                 }
             }
         )
@@ -344,7 +370,7 @@ private fun SpecialOfferCard(offer: StoreOffer) {
                     .background(LumiColors.Cream),
                 contentAlignment = Alignment.Center
             ) {
-                Text(offer.emoji, fontSize = 30.sp)
+                LumiEmoji(offer.emoji, size = 34.dp)
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -397,7 +423,7 @@ private fun StoreItemRow(
                     .background(LumiColors.Cream),
                 contentAlignment = Alignment.Center
             ) {
-                Text(offer.emoji, fontSize = 31.sp)
+                LumiEmoji(offer.emoji, size = 36.dp)
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -415,7 +441,7 @@ private fun StoreItemRow(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    offer.status ?: (offer.price?.let { "💎 $it" } ?: "DISPONIBLE"),
+                    offer.status ?: (offer.price?.let { stringResource(R.string.gemas_2, it) } ?: "DISPONIBLE"),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = LumiColors.YellowStrong
@@ -450,7 +476,7 @@ private fun GemPackRow(
                     .background(LumiColors.Cream),
                 contentAlignment = Alignment.Center
             ) {
-                Text(pack.emoji, fontSize = 30.sp)
+                LumiEmoji(pack.emoji, size = 34.dp)
             }
             Spacer(modifier = Modifier.width(14.dp))
             Text(
@@ -467,5 +493,33 @@ private fun GemPackRow(
                 color = LumiColors.YellowStrong
             )
         }
+    }
+}
+
+internal fun isStreakItem(item: StoreItemResponse): Boolean {
+    val text = "${item.type.orEmpty()} ${item.name}".lowercase()
+    return "streak" in text || "racha" in text || "protector" in text
+}
+
+private fun storeEmoji(item: StoreItemResponse): String {
+    val text = "${item.type.orEmpty()} ${item.name}".lowercase()
+    return when {
+        isStreakItem(item) -> "🛡️"
+        "xp" in text || "boost" in text || "multiplic" in text -> "🧪"
+        "time" in text || "tiempo" in text -> "⏱️"
+        else -> "🎁"
+    }
+}
+
+@Composable
+private fun EmptyStoreText(loaded: Boolean) {
+    if (loaded) {
+        Text(
+            text = stringResource(R.string.no_hay_articulos_disponibles_por),
+            fontSize = 13.sp,
+            color = LumiColors.Dark.copy(alpha = 0.65f)
+        )
+    } else {
+        SkeletonList(count = 2)
     }
 }

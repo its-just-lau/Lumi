@@ -22,7 +22,8 @@ fun LumiButton(
     modifier: Modifier = Modifier,
     backgroundColor: Color = LumiColors.Yellow,
     textColor: Color = LumiColors.Dark,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    icon: LumiIconKind? = null
 ) {
     Button(
         onClick = onClick,
@@ -36,10 +37,14 @@ fun LumiButton(
             contentColor = textColor
         )
     ) {
-        Text(
-            text = text,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold
-        )
+        if (icon != null) {
+            LumiIcon(icon, size = 30.dp)
+        } else {
+            Text(
+                text = text,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
