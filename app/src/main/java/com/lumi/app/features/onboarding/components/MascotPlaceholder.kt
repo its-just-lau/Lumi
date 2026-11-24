@@ -17,27 +17,43 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import com.lumi.app.ui.theme.LumiColors
+import androidx.annotation.RawRes
+import androidx.compose.foundation.layout.aspectRatio
+import com.lumi.app.mascot.MascotAnimation
+import androidx.compose.ui.unit.Dp
 
 @Composable
 fun MascotPlaceholder(
     modifier: Modifier = Modifier,
-    message: String? = null
+    message: String? = null,
+    @RawRes animationRes: Int? = null,
+    animationHeight: Dp = 190.dp
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .size(width = 280.dp, height = 220.dp)
-                .clip(RoundedCornerShape(28.dp))
-                .background(LumiColors.Yellow.copy(alpha = 0.18f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "🦎",
-                fontSize = 88.sp
+        if (animationRes != null) {
+            MascotAnimation(
+                resId = animationRes,
+                modifier = Modifier
+                    .height(animationHeight)
+                    .aspectRatio(9f / 16f)
+                    .clip(RoundedCornerShape(24.dp))
             )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(width = 280.dp, height = 220.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(LumiColors.Yellow.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "🦎",
+                    fontSize = 88.sp
+                )
+            }
         }
 
         if (message != null) {

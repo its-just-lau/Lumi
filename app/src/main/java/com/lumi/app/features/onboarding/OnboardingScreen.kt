@@ -1,6 +1,7 @@
 
 package com.lumi.app.features.onboarding
 
+import com.lumi.app.core.components.LumiEmoji
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,13 +23,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import com.lumi.app.data.local.OnboardingPreferencesRepository
 import kotlinx.coroutines.flow.first
+import androidx.compose.ui.res.stringResource
+import com.lumi.app.R
+import com.lumi.app.core.i18n.AppText
+import androidx.compose.ui.platform.LocalConfiguration
 
-private val goals = listOf(
-    "Organizar mis actividades",
-    "Mejorar mis hábitos de estudio",
-    "Aprender nuevos temas",
-    "Administrar mis tareas",
-    "Dar seguimiento a mi progreso"
+private val goals: List<String> get() = listOf(
+    AppText.get(R.string.organizar_mis_actividades),
+    AppText.get(R.string.mejorar_mis_habitos_de_estudio),
+    AppText.get(R.string.aprender_nuevos_temas),
+    AppText.get(R.string.administrar_mis_tareas),
+    AppText.get(R.string.dar_seguimiento_a_mi_progreso)
 )
 
 private data class TourContent(
@@ -37,25 +42,25 @@ private data class TourContent(
     val emoji: String
 )
 
-private val tourPages = listOf(
+private val tourPages: List<TourContent> get() = listOf(
     TourContent(
-        "Aprender",
-        "Encuentra materiales, explicaciones, tarjetas y cuestionarios para aprender a tu ritmo.",
+        AppText.get(R.string.aprender),
+        AppText.get(R.string.encuentra_materiales_explicaciones_tarjetas_y),
         "📚"
     ),
     TourContent(
-        "Organizar",
-        "Administra tus materias, actividades, horarios y pendientes en un solo lugar.",
+        AppText.get(R.string.organizar),
+        AppText.get(R.string.administra_tus_materias_actividades_horarios),
         "🗓️"
     ),
     TourContent(
-        "Estudiar",
-        "Utiliza sesiones de estudio y temporizadores para mantener la concentración.",
+        AppText.get(R.string.estudiar),
+        AppText.get(R.string.utiliza_sesiones_de_estudio_y),
         "⏱️"
     ),
     TourContent(
-        "Progresar",
-        "Consigue experiencia, mantén tu racha y observa cómo avanzas.",
+        AppText.get(R.string.progresar),
+        AppText.get(R.string.consigue_experiencia_manten_tu_racha),
         "⭐"
     )
 )
@@ -140,6 +145,14 @@ fun OnboardingScreen(
 
     val tourPage = tourPages[tourIndex]
 
+    // Deja ver la pantalla final unos segundos antes de ir al registro.
+    LaunchedEffect(currentStep) {
+        if (currentStep == OnboardingStep.COMPLETE) {
+            kotlinx.coroutines.delay(COMPLETE_STEP_MILLIS)
+            onRegisterClick()
+        }
+    }
+
     fun nextStep() {
         currentStep = when (currentStep) {
             OnboardingStep.WELCOME -> OnboardingStep.GOALS
@@ -150,7 +163,6 @@ fun OnboardingScreen(
                     tourIndex++
                     OnboardingStep.TOUR
                 } else {
-                    onRegisterClick()
                     OnboardingStep.COMPLETE
                 }
             }
@@ -180,7 +192,6 @@ fun OnboardingScreen(
             OnboardingStep.DAILY_GOAL -> currentStep = OnboardingStep.TOUR
             OnboardingStep.TOUR -> {
                 tourIndex = tourPages.lastIndex
-                onRegisterClick()
                 currentStep = OnboardingStep.COMPLETE
             }
             else -> Unit
@@ -203,10 +214,10 @@ fun OnboardingScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Lumi",
+            text = stringResource(R.string.lumi),
             fontSize = 36.sp,
             fontWeight = FontWeight.ExtraBold,
-            color = LumiColors.Dark
+            color = LumiColors.Yellow
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -222,14 +233,31 @@ fun OnboardingScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        val screenHeight = LocalConfiguration.current.screenHeightDp
+        val hasAnimation = currentStep == OnboardingStep.WELCOME ||
+                currentStep == OnboardingStep.GOALS ||
+                currentStep == OnboardingStep.DAILY_GOAL ||
+                currentStep == OnboardingStep.COMPLETE
+
         MascotPlaceholder(
-            modifier = Modifier.height(190.dp),
+            modifier = if (hasAnimation) Modifier else Modifier.height(190.dp),
+            animationHeight = if (currentStep == OnboardingStep.WELCOME) {
+                (screenHeight * 0.45f).dp
+            } else {
+                210.dp
+            },
+            animationRes = when (currentStep) {
+                OnboardingStep.WELCOME -> R.raw.lumi_saludo
+                OnboardingStep.GOALS, OnboardingStep.DAILY_GOAL -> R.raw.lumi_pensando
+                OnboardingStep.COMPLETE -> R.raw.lumi_todo_listo
+                else -> null
+            },
             message = when (currentStep) {
-                OnboardingStep.WELCOME -> "¡Hola! Soy Lumi"
-                OnboardingStep.GOALS -> "¡Vamos a definir tus objetivos!"
-                OnboardingStep.DAILY_GOAL -> "¡Cada minuto cuenta!"
-                OnboardingStep.TOUR -> "¡Te enseño cómo funciona!"
-                OnboardingStep.COMPLETE -> "¡Ya casi estamos!"
+                OnboardingStep.WELCOME -> stringResource(R.string.hola_soy_lumi)
+                OnboardingStep.GOALS -> stringResource(R.string.vamos_a_definir_tus_objetivos)
+                OnboardingStep.DAILY_GOAL -> stringResource(R.string.cada_minuto_cuenta)
+                OnboardingStep.TOUR -> stringResource(R.string.te_enseno_como_funciona)
+                OnboardingStep.COMPLETE -> stringResource(R.string.ya_casi_estamos)
             }
         )
 
@@ -238,7 +266,7 @@ fun OnboardingScreen(
         when (currentStep) {
             OnboardingStep.WELCOME -> {
                 Text(
-                    text = "¡Aprender puede ser increíble!",
+                    text = stringResource(R.string.aprender_puede_ser_increible),
                     fontSize = 25.sp,
                     fontWeight = FontWeight.Bold,
                     color = LumiColors.Dark,
@@ -248,7 +276,7 @@ fun OnboardingScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Organiza tus actividades, descubre nuevas formas de aprender y convierte cada sesión de estudio en un logro.",
+                    text = stringResource(R.string.organiza_tus_actividades_descubre_nuevas),
                     color = LumiColors.Dark,
                     textAlign = TextAlign.Center
                 )
@@ -256,7 +284,7 @@ fun OnboardingScreen(
                 Spacer(modifier = Modifier.weight(1f))
 
                 LumiButton(
-                    text = "Comenzar",
+                    text = stringResource(R.string.comenzar),
                     onClick = {
                         onStartClick()
                         nextStep()
@@ -266,7 +294,7 @@ fun OnboardingScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 LumiButton(
-                    text = "Ya tengo una cuenta",
+                    text = stringResource(R.string.ya_tengo_una_cuenta),
                     onClick = onLoginClick,
                     backgroundColor = LumiColors.WarmGray
                 )
@@ -282,7 +310,7 @@ fun OnboardingScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "¿Qué quieres lograr con Lumi?",
+                        text = stringResource(R.string.que_quieres_lograr_con_lumi),
                         fontSize = 23.sp,
                         fontWeight = FontWeight.Bold,
                         color = LumiColors.Dark,
@@ -290,7 +318,7 @@ fun OnboardingScreen(
                     )
 
                     Text(
-                        text = "Selecciona todas las opciones que te interesen.",
+                        text = stringResource(R.string.selecciona_todas_las_opciones_que),
                         color = LumiColors.Dark,
                         textAlign = TextAlign.Center
                     )
@@ -347,22 +375,22 @@ fun OnboardingScreen(
                 }
 
                 LumiButton(
-                    text = "Continuar",
+                    text = stringResource(R.string.continuar),
                     onClick = ::nextStep
                 )
 
                 TextButton(onClick = ::skipStep) {
-                    Text("Omitir", color = LumiColors.Dark)
+                    Text(stringResource(R.string.omitir), color = LumiColors.Dark)
                 }
 
                 TextButton(onClick = ::previousStep) {
-                    Text("Atrás", color = LumiColors.Dark)
+                    Text(stringResource(R.string.atras), color = LumiColors.Dark)
                 }
             }
 
             OnboardingStep.DAILY_GOAL -> {
                 Text(
-                    text = "¿Cuánto quieres estudiar al día?",
+                    text = stringResource(R.string.cuanto_quieres_estudiar_al_dia),
                     fontSize = 23.sp,
                     fontWeight = FontWeight.Bold,
                     color = LumiColors.Dark,
@@ -372,14 +400,14 @@ fun OnboardingScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Puedes cambiar tu objetivo cuando quieras.",
+                    text = stringResource(R.string.puedes_cambiar_tu_objetivo_cuando),
                     color = LumiColors.Dark
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
-                    text = "$dailyGoal min",
+                    text = stringResource(R.string.min, dailyGoal),
                     fontSize = 42.sp,
                     fontWeight = FontWeight.Bold,
                     color = LumiColors.Dark
@@ -402,29 +430,29 @@ fun OnboardingScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("5 min", color = LumiColors.Dark)
-                    Text("60 min", color = LumiColors.Dark)
+                    Text(stringResource(R.string.s_5_min), color = LumiColors.Dark)
+                    Text(stringResource(R.string.s_60_min), color = LumiColors.Dark)
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
 
                 LumiButton(
-                    text = "Continuar",
+                    text = stringResource(R.string.continuar),
                     onClick = ::nextStep
                 )
 
                 TextButton(onClick = ::skipStep) {
-                    Text("Omitir", color = LumiColors.Dark)
+                    Text(stringResource(R.string.omitir), color = LumiColors.Dark)
                 }
 
                 TextButton(onClick = ::previousStep) {
-                    Text("Atrás", color = LumiColors.Dark)
+                    Text(stringResource(R.string.atras), color = LumiColors.Dark)
                 }
             }
 
             OnboardingStep.TOUR -> {
                 Text(
-                    text = "Conoce ${tourPage.title}",
+                    text = stringResource(R.string.conoce, tourPage.title),
                     fontSize = 25.sp,
                     fontWeight = FontWeight.Bold,
                     color = LumiColors.Dark
@@ -432,10 +460,7 @@ fun OnboardingScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                Text(
-                    text = tourPage.emoji,
-                    fontSize = 55.sp
-                )
+                LumiEmoji(tourPage.emoji, size = 60.dp)
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -448,7 +473,7 @@ fun OnboardingScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Text(
-                    text = "${tourIndex + 1} de ${tourPages.size}",
+                    text = stringResource(R.string.de, tourIndex + 1, tourPages.size),
                     color = LumiColors.Dark,
                     fontWeight = FontWeight.Medium
                 )
@@ -457,25 +482,25 @@ fun OnboardingScreen(
 
                 LumiButton(
                     text = if (tourIndex == tourPages.lastIndex) {
-                        "Crear mi cuenta"
+                        AppText.get(R.string.crear_mi_cuenta)
                     } else {
-                        "Siguiente"
+                        AppText.get(R.string.siguiente)
                     },
                     onClick = ::nextStep
                 )
 
                 TextButton(onClick = ::skipStep) {
-                    Text("Omitir recorrido", color = LumiColors.Dark)
+                    Text(stringResource(R.string.omitir_recorrido), color = LumiColors.Dark)
                 }
 
                 TextButton(onClick = ::previousStep) {
-                    Text("Atrás", color = LumiColors.Dark)
+                    Text(stringResource(R.string.atras), color = LumiColors.Dark)
                 }
             }
 
             OnboardingStep.COMPLETE -> {
                 Text(
-                    text = "¡Todo listo!",
+                    text = stringResource(R.string.todo_listo),
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
                     color = LumiColors.Dark
@@ -484,3 +509,5 @@ fun OnboardingScreen(
         }
     }
 }
+
+private const val COMPLETE_STEP_MILLIS = 2000L

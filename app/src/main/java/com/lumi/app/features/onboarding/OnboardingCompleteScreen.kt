@@ -27,6 +27,8 @@ import com.lumi.app.data.local.OnboardingPreferencesRepository
 import com.lumi.app.features.onboarding.components.MascotPlaceholder
 import com.lumi.app.ui.theme.LumiColors
 import kotlinx.coroutines.flow.first
+import androidx.compose.ui.res.stringResource
+import com.lumi.app.R
 
 @Composable
 fun OnboardingCompleteScreen(
@@ -59,7 +61,7 @@ fun OnboardingCompleteScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "¡Bienvenido a Lumi!",
+            text = stringResource(R.string.bienvenido_a_lumi),
             fontSize = 30.sp,
             fontWeight = FontWeight.ExtraBold,
             color = LumiColors.Dark,
@@ -69,14 +71,15 @@ fun OnboardingCompleteScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         MascotPlaceholder(
-            modifier = Modifier.height(190.dp),
-            message = "¡Estoy feliz de acompañarte!"
+            message = stringResource(R.string.estoy_feliz_de_acompanarte),
+            animationRes = R.raw.lumi_todo_listo,
+            animationHeight = 240.dp
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "Tu camino de aprendizaje comienza hoy.",
+            text = stringResource(R.string.tu_camino_de_aprendizaje_comienza),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = LumiColors.Dark,
@@ -86,7 +89,7 @@ fun OnboardingCompleteScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "Tu meta diaria será de $dailyGoal minutos. Puedes modificarla cuando quieras.",
+            text = stringResource(R.string.tu_meta_diaria_sera_de, dailyGoal),
             style = MaterialTheme.typography.bodyLarge,
             color = LumiColors.Dark,
             textAlign = TextAlign.Center
@@ -95,7 +98,7 @@ fun OnboardingCompleteScreen(
         Spacer(modifier = Modifier.height(36.dp))
 
         LumiButton(
-            text = "Ir a Lumi",
+            text = stringResource(R.string.ir_a_lumi),
             onClick = onContinueClick
         )
     }
