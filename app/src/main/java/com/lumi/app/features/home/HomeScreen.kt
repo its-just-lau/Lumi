@@ -1,6 +1,10 @@
 
 package com.lumi.app.features.home
 
+import com.lumi.app.core.components.LumiIcon
+import com.lumi.app.mascot.LumiAnimations
+import com.lumi.app.mascot.MascotImage
+import com.lumi.app.core.components.LumiIconKind
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -25,34 +30,80 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.lumi.app.LumiApp
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import com.lumi.app.data.models.tasks.TaskResponse
+import com.lumi.app.features.tasks.TaskViewModel
+import com.lumi.app.features.tasks.TaskViewModelFactory
+import com.lumi.app.features.tasks.TasksUiState
+import com.lumi.app.features.tasks.dueDateOrNull
+import com.lumi.app.features.tasks.isCompleted
+import com.lumi.app.features.calendar.CalendarViewModel
+import com.lumi.app.features.calendar.CalendarViewModelFactory
+import com.lumi.app.features.calendar.EventDialog
+import com.lumi.app.features.calendar.GoogleCalendarPrefs
+import com.lumi.app.features.calendar.rememberGoogleCalendarAccess
 import com.lumi.app.core.components.LumiBottomBar
+import com.lumi.app.core.components.SkeletonBox
+import com.lumi.app.features.stats.StatsViewModel
+import com.lumi.app.features.stats.StatsViewModelFactory
 import com.lumi.app.ui.theme.LumiColors
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import androidx.compose.ui.res.stringResource
+import com.lumi.app.R
+import com.lumi.app.core.i18n.AppText
 
 private data class DashboardTask(
-    val id: Int,
+    val id: String,
     val title: String,
     val date: LocalDate,
-    val isDone: Boolean = false
+    val isDone: Boolean,
+    val source: TaskResponse
 )
+
+// Meta diaria usada si el usuario aún no ha configurado la suya (en minutos)
+private const val DEFAULT_DAILY_GOAL = 60
 
 @Composable
 fun HomeScreen(
     onNavigate: (String) -> Unit
 ) {
-    // DATOS PROVISIONALES
-    val userName = "Laura Chávez"
-    val gems = 1439
-    val streakDays = 20
+    val container = LumiApp.container
+    val context = LocalContext.current
 
-    val weeklyStudiedMinutes = 275
-    val weeklyGoalMinutes = 360
+    // Nombre real del usuario
+    val userName by produceState("") {
+        value = container.userRepository.getProfile().getOrNull()?.name.orEmpty()
+    }
+
+    val statsViewModel: StatsViewModel = viewModel(
+        factory = StatsViewModelFactory(LumiApp.container.progressRepository)
+    )
+    val userStats by statsViewModel.stats.collectAsState()
+    val gems = userStats.gems
+    val streakDays = userStats.streakDays
+
+    LaunchedEffect(Unit) {
+        statsViewModel.load()
+    }
+
+    // Meta semanal: minutos estudiados esta semana vs. meta diaria x 7 de las preferencias
+    val weeklyStudiedMinutes by produceState(0) {
+        value = container.progressRepository.getWeekly().getOrNull()
+            ?.dailyMinutes?.sum() ?: 0
+    }
+    val weeklyGoalMinutes by produceState(DEFAULT_DAILY_GOAL * 7) {
+        val daily = container.userRepository.getPreferences().getOrNull()?.dailyGoalMinutes
+        value = (daily ?: DEFAULT_DAILY_GOAL) * 7
+    }
 
     val weeklyProgress =
-        weeklyStudiedMinutes.toFloat() / weeklyGoalMinutes
+        weeklyStudiedMinutes.toFloat() / weeklyGoalMinutes.coerceAtLeast(1)
 
     val today = remember { LocalDate.now() }
 
@@ -63,27 +114,90 @@ fun HomeScreen(
         mutableStateOf(YearMonth.from(today))
     }
 
-    // TAREAS PROVISIONALES
-    val tasks = remember {
-        mutableStateListOf(
-            DashboardTask(1, "Terminar ejercicios de Kotlin", today),
-            DashboardTask(2, "Repasar apuntes de Bases de Datos", today),
-            DashboardTask(3, "Preparar exposición", today.plusDays(1)),
-            DashboardTask(4, "Realizar práctica de programación", today.plusDays(2)),
-            DashboardTask(5, "Estudiar para el examen", today.plusDays(2))
+    // TAREAS REALES (las mismas de la pantalla Tareas)
+    val taskViewModel: TaskViewModel = viewModel(
+        factory = TaskViewModelFactory(
+            container.taskRepository,
+            container.subjectRepository
         )
+    )
+    val tasksState by taskViewModel.uiState.collectAsState()
+    val taskMessage by taskViewModel.message.collectAsState()
+
+    LaunchedEffect(Unit) {
+        taskViewModel.loadTasks()
     }
 
-    // EVENTOS PROVISIONALES DEL CALENDARIO
-    val eventDates = remember(today) {
-        setOf(
-            today,
-            today.plusDays(2),
-            today.plusDays(5),
-            today.plusDays(8),
-            today.plusDays(12)
-        )
+    LaunchedEffect(taskMessage) {
+        taskMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            taskViewModel.consumeMessage()
+            statsViewModel.load()
+        }
     }
+
+    val tasks = (tasksState as? TasksUiState.Success)?.tasks.orEmpty()
+        .filter { it.deletedAt == null }
+        .mapNotNull { task ->
+            task.dueDateOrNull()?.let { date ->
+                DashboardTask(task.id, task.title, date, task.isCompleted(), task)
+            }
+        }
+
+    // GOOGLE CALENDAR
+    val calendarViewModel: CalendarViewModel = viewModel(
+        factory = CalendarViewModelFactory(container.googleCalendarRepository)
+    )
+    val googleEvents by calendarViewModel.events.collectAsState()
+    val calendarSaving by calendarViewModel.saving.collectAsState()
+    val calendarMessage by calendarViewModel.message.collectAsState()
+
+    val calendarPrefs = remember { GoogleCalendarPrefs(context) }
+    var calendarConnected by remember { mutableStateOf(calendarPrefs.connected) }
+    var showEventDialog by remember { mutableStateOf(false) }
+
+    // El token de Google dura 1 hora; se reutiliza mientras siga vigente
+    var googleToken by remember { mutableStateOf<String?>(null) }
+    var googleTokenTime by remember { mutableLongStateOf(0L) }
+
+    val calendarAccess = rememberGoogleCalendarAccess(
+        onError = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+    )
+
+    fun withGoogleToken(interactive: Boolean, block: (String) -> Unit) {
+        val cached = googleToken
+        val fresh = System.currentTimeMillis() - googleTokenTime < 50 * 60 * 1000L
+
+        if (cached != null && fresh) {
+            block(cached)
+        } else {
+            calendarAccess.request(interactive) { token ->
+                googleToken = token
+                googleTokenTime = System.currentTimeMillis()
+                block(token)
+            }
+        }
+    }
+
+    // Carga los eventos del mes mostrado (sin mostrar pantallas de Google si ya hay permiso)
+    LaunchedEffect(calendarConnected, displayedMonth) {
+        if (calendarConnected) {
+            withGoogleToken(interactive = false) { token ->
+                calendarViewModel.loadMonth(token, displayedMonth)
+            }
+        }
+    }
+
+    LaunchedEffect(calendarMessage) {
+        calendarMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            calendarViewModel.consumeMessage()
+        }
+    }
+
+    // Días del calendario con tareas pendientes o eventos de Google
+    val eventDates = tasks.filter { !it.isDone }.map { it.date }.toSet() +
+            googleEvents.map { it.date }.toSet()
 
     // TAREAS DEL DÍA SELECCIONADO Y LOS DOS SIGUIENTES
     val upcomingTasks = tasks.filter {
@@ -127,19 +241,27 @@ fun HomeScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.AccountCircle,
-                        contentDescription = "Ir al perfil",
+                        contentDescription = stringResource(R.string.ir_al_perfil),
                         tint = LumiColors.YellowStrong,
                         modifier = Modifier.size(52.dp)
                     )
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    Text(
-                        text = userName,
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = LumiColors.Dark
-                    )
+                    if (userName.isBlank()) {
+                        SkeletonBox(
+                            modifier = Modifier
+                                .width(130.dp)
+                                .height(20.dp)
+                        )
+                    } else {
+                        Text(
+                            text = userName,
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = LumiColors.Dark
+                        )
+                    }
                 }
 
                 Row(
@@ -152,10 +274,7 @@ fun HomeScreen(
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "💎",
-                        fontSize = 23.sp
-                    )
+                    LumiIcon(LumiIconKind.Gem, size = 28.dp)
 
                     Spacer(modifier = Modifier.width(6.dp))
 
@@ -187,9 +306,9 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            text = "🔥",
-                            fontSize = 55.sp
+                        LumiIcon(
+                            if (streakDays > 0) LumiIconKind.Flame else LumiIconKind.FlameOff,
+                            size = 60.dp
                         )
 
                         Text(
@@ -200,7 +319,7 @@ fun HomeScreen(
                         )
 
                         Text(
-                            text = "días de racha",
+                            text = stringResource(R.string.dias_de_racha),
                             fontSize = 19.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color.Black,
@@ -212,13 +331,22 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            text = "🦎",
-                            fontSize = 78.sp
+                        com.lumi.app.mascot.MascotAnimation(
+                            resId = if (streakDays > 0) {
+                                com.lumi.app.mascot.LumiAnimations.STREAK_ACTIVE
+                            } else {
+                                com.lumi.app.mascot.LumiAnimations.STREAK_NONE
+                            },
+                            modifier = Modifier
+                                .height(150.dp)
+                                .aspectRatio(9f / 16f)
+                                .clip(RoundedCornerShape(18.dp))
                         )
 
+                        Spacer(modifier = Modifier.height(6.dp))
+
                         Text(
-                            text = "¡Lo estás haciendo genial!",
+                            text = stringResource(R.string.lo_estas_haciendo_genial),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = LumiColors.Dark,
@@ -247,15 +375,12 @@ fun HomeScreen(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "📚",
-                            fontSize = 22.sp
-                        )
+                        LumiIcon(LumiIconKind.Book, size = 26.dp)
 
                         Spacer(modifier = Modifier.width(8.dp))
 
                         Text(
-                            text = "Continúa aprendiendo",
+                            text = stringResource(R.string.continua_aprendiendo),
                             color = LumiColors.White,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f)
@@ -271,7 +396,7 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        text = "Recursividad en Kotlin",
+                        text = stringResource(R.string.retoma_tu_estudio),
                         fontSize = 23.sp,
                         fontWeight = FontWeight.Bold,
                         color = LumiColors.White
@@ -280,21 +405,9 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
-                        text = "Programación móvil · 2 de 5 actividades",
+                        text = stringResource(R.string.repasa_tus_materiales),
                         fontSize = 13.sp,
                         color = LumiColors.Yellow
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    LinearProgressIndicator(
-                        progress = { 0.4f },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(9.dp)
-                            .clip(CircleShape),
-                        color = LumiColors.Yellow,
-                        trackColor = Color(0xFF8D793A)
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -318,7 +431,7 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.width(8.dp))
 
                         Text(
-                            text = "Continuar lección",
+                            text = stringResource(R.string.continuar_leccion),
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -340,12 +453,16 @@ fun HomeScreen(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.TrackChanges,
-                            contentDescription = null,
-                            tint = LumiColors.YellowStrong,
-                            modifier = Modifier.size(38.dp)
-                        )
+                        if (weeklyProgress >= 1f) {
+                            MascotImage(LumiAnimations.WEEKLY_GOAL, 64.dp)
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.TrackChanges,
+                                contentDescription = null,
+                                tint = LumiColors.YellowStrong,
+                                modifier = Modifier.size(38.dp)
+                            )
+                        }
 
                         Spacer(modifier = Modifier.width(12.dp))
 
@@ -353,7 +470,7 @@ fun HomeScreen(
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
-                                text = "Meta semanal",
+                                text = stringResource(R.string.meta_semanal),
                                 fontWeight = FontWeight.Bold,
                                 color = LumiColors.Dark
                             )
@@ -370,7 +487,7 @@ fun HomeScreen(
                         }
 
                         Text(
-                            text = "${(weeklyProgress * 100).toInt()}%",
+                            text = stringResource(R.string.text, (weeklyProgress * 100).toInt()),
                             fontSize = 23.sp,
                             fontWeight = FontWeight.Bold,
                             color = LumiColors.YellowStrong
@@ -425,11 +542,31 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.width(5.dp))
 
                             Text(
-                                text = "Calendario",
+                                text = stringResource(R.string.calendario),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = LumiColors.Dark
+                                color = LumiColors.Dark,
+                                modifier = Modifier.weight(1f)
                             )
+
+                            // Agregar evento a Google Calendar
+                            IconButton(
+                                onClick = {
+                                    withGoogleToken(interactive = true) {
+                                        calendarPrefs.connected = true
+                                        calendarConnected = true
+                                        showEventDialog = true
+                                    }
+                                },
+                                modifier = Modifier.size(25.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = stringResource(R.string.agregar_evento_a_google_calendar),
+                                    tint = LumiColors.Dark,
+                                    modifier = Modifier.size(19.dp)
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
@@ -447,7 +584,7 @@ fun HomeScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.ChevronLeft,
-                                    contentDescription = "Mes anterior",
+                                    contentDescription = stringResource(R.string.mes_anterior),
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -456,7 +593,7 @@ fun HomeScreen(
                                 text = displayedMonth.month
                                     .getDisplayName(
                                         java.time.format.TextStyle.FULL,
-                                        Locale("es", "MX")
+                                        androidx.compose.ui.text.intl.Locale.current.platformLocale
                                     )
                                     .replaceFirstChar {
                                         it.uppercase()
@@ -477,7 +614,7 @@ fun HomeScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.ChevronRight,
-                                    contentDescription = "Mes siguiente",
+                                    contentDescription = stringResource(R.string.mes_siguiente),
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -511,7 +648,7 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.width(4.dp))
 
                             Text(
-                                text = "Eventos",
+                                text = stringResource(R.string.eventos),
                                 fontSize = 9.sp,
                                 color = Color.Gray
                             )
@@ -532,7 +669,7 @@ fun HomeScreen(
                     ) {
 
                         Text(
-                            text = "Mis tareas",
+                            text = stringResource(R.string.mis_tareas),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = LumiColors.Dark
@@ -540,9 +677,18 @@ fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        if (upcomingTasks.isEmpty()) {
+                        if (tasksState is TasksUiState.Idle || tasksState is TasksUiState.Loading) {
+                            repeat(3) {
+                                SkeletonBox(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .height(14.dp)
+                                )
+                            }
+                        } else if (upcomingTasks.isEmpty()) {
                             Text(
-                                text = "No tienes tareas pendientes para estos días.",
+                                text = stringResource(R.string.no_tienes_tareas_pendientes_para),
                                 fontSize = 11.sp,
                                 color = Color.Gray
                             )
@@ -554,9 +700,9 @@ fun HomeScreen(
                                 .forEach { (date, dayTasks) ->
 
                                     val dayLabel = when (date) {
-                                        selectedDate -> "Día seleccionado"
-                                        selectedDate.plusDays(1) -> "Siguiente día"
-                                        else -> "Dos días después"
+                                        selectedDate -> stringResource(R.string.dia_seleccionado)
+                                        selectedDate.plusDays(1) -> stringResource(R.string.siguiente_dia)
+                                        else -> stringResource(R.string.dos_dias_despues)
                                     }
 
                                     Text(
@@ -581,17 +727,8 @@ fun HomeScreen(
                                         ) {
                                             Checkbox(
                                                 checked = task.isDone,
-                                                onCheckedChange = { checked ->
-                                                    val index = tasks.indexOfFirst {
-                                                        it.id == task.id
-                                                    }
-
-                                                    if (index != -1) {
-                                                        tasks[index] =
-                                                            tasks[index].copy(
-                                                                isDone = checked
-                                                            )
-                                                    }
+                                                onCheckedChange = {
+                                                    taskViewModel.toggleComplete(task.source)
                                                 },
                                                 modifier = Modifier.size(25.dp),
                                                 colors = CheckboxDefaults.colors(
@@ -621,12 +758,71 @@ fun HomeScreen(
                                     )
                                 }
                         }
+
+                        // EVENTOS DE GOOGLE CALENDAR
+                        val windowEvents = googleEvents
+                            .filter {
+                                !it.date.isBefore(selectedDate) &&
+                                        !it.date.isAfter(selectedDate.plusDays(2))
+                            }
+                            .sortedWith(compareBy({ it.date }, { it.time ?: "" }))
+
+                        if (windowEvents.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = stringResource(R.string.eventos_de_google_calendar),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = LumiColors.YellowStrong
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            windowEvents.forEach { event ->
+                                Text(
+                                    text = stringResource(
+                                        R.string.event_line,
+                                        event.date.dayOfMonth,
+                                        event.date.monthValue,
+                                        event.time ?: stringResource(R.string.todo_el_dia),
+                                        event.title
+                                    ),
+                                    fontSize = 10.sp,
+                                    color = LumiColors.Dark,
+                                    lineHeight = 13.sp,
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
         }
+    }
+
+    if (showEventDialog) {
+        EventDialog(
+            date = selectedDate,
+            saving = calendarSaving,
+            onDismiss = { showEventDialog = false },
+            onSave = { title, description, allDay, start, end ->
+                withGoogleToken(interactive = true) { token ->
+                    calendarViewModel.createEvent(
+                        accessToken = token,
+                        title = title,
+                        description = description,
+                        date = selectedDate,
+                        allDay = allDay,
+                        start = start,
+                        end = end,
+                        onCreated = { showEventDialog = false }
+                    )
+                }
+            }
+        )
     }
 }
 

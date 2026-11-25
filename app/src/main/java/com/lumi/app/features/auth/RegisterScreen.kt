@@ -31,12 +31,17 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.res.stringResource
+import com.lumi.app.R
+import com.lumi.app.core.i18n.AppText
 
 @Composable
 fun RegisterScreen(
     onRegisterClick: (String, String, String) -> Unit,
     onLoginClick: () -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    isLoading: Boolean = false,
+    serverErrorMessage: String? = null
 ) {
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -63,7 +68,7 @@ fun RegisterScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "¡Únete a Lumi!",
+            text = stringResource(R.string.unete_a_lumi),
             fontSize = 36.sp,
             fontWeight = FontWeight.ExtraBold,
             color = LumiColors.Dark
@@ -72,7 +77,7 @@ fun RegisterScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "Crea tu cuenta y comienza a organizar tu aprendizaje.",
+            text = stringResource(R.string.crea_tu_cuenta_y_comienza),
             style = MaterialTheme.typography.bodyLarge,
             color = LumiColors.Dark,
             textAlign = TextAlign.Center
@@ -87,8 +92,8 @@ fun RegisterScreen(
                 errorMessage = ""
             },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Nombre completo") },
-            placeholder = { Text("Tu nombre") },
+            label = { Text(stringResource(R.string.nombre_completo)) },
+            placeholder = { Text(stringResource(R.string.tu_nombre)) },
             singleLine = true,
             shape = RoundedCornerShape(14.dp)
         )
@@ -102,7 +107,7 @@ fun RegisterScreen(
                 errorMessage = ""
             },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Correo electrónico") },
+            label = { Text(stringResource(R.string.correo_electronico)) },
             placeholder = { Text("ejemplo@correo.com") },
             singleLine = true,
             shape = RoundedCornerShape(14.dp)
@@ -117,7 +122,7 @@ fun RegisterScreen(
                 errorMessage = ""
             },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Contraseña") },
+            label = { Text(stringResource(R.string.contrasena)) },
             singleLine = true,
             visualTransformation = if (passwordVisible) {
                 VisualTransformation.None
@@ -135,9 +140,9 @@ fun RegisterScreen(
                             Icons.Default.Visibility
                         },
                         contentDescription = if (passwordVisible) {
-                            "Ocultar contraseña"
+                            AppText.get(R.string.ocultar_contrasena)
                         } else {
-                            "Mostrar contraseña"
+                            AppText.get(R.string.mostrar_contrasena)
                         }
                     )
                 }
@@ -154,7 +159,7 @@ fun RegisterScreen(
                 errorMessage = ""
             },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Confirmar contraseña") },
+            label = { Text(stringResource(R.string.confirmar_contrasena)) },
             singleLine = true,
             visualTransformation = if (confirmPasswordVisible) {
                 VisualTransformation.None
@@ -174,9 +179,9 @@ fun RegisterScreen(
                             Icons.Default.Visibility
                         },
                         contentDescription = if (confirmPasswordVisible) {
-                            "Ocultar contraseña"
+                            AppText.get(R.string.ocultar_contrasena)
                         } else {
-                            "Mostrar contraseña"
+                            AppText.get(R.string.mostrar_contrasena)
                         }
                     )
                 }
@@ -186,16 +191,18 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (errorMessage.isNotBlank()) {
+        val shownError = errorMessage.ifBlank { serverErrorMessage.orEmpty() }
+
+        if (shownError.isNotBlank()) {
             Text(
-                text = errorMessage,
+                text = shownError,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall
             )
         }
 
         Text(
-            text = "La contraseña debe tener al menos 8 caracteres.",
+            text = stringResource(R.string.la_contrasena_debe_tener_al),
             color = LumiColors.Dark,
             style = MaterialTheme.typography.bodySmall
         )
@@ -203,17 +210,17 @@ fun RegisterScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         LumiButton(
-            text = "Crear cuenta",
+            text = if (isLoading) stringResource(R.string.creando_cuenta) else stringResource(R.string.crear_cuenta),
             onClick = {
                 when {
                     !email.contains("@") -> {
-                        errorMessage = "Ingresa un correo electrónico válido."
+                        errorMessage = AppText.get(R.string.ingresa_un_correo_electronico_valido)
                     }
                     password.length < 8 -> {
-                        errorMessage = "La contraseña debe tener al menos 8 caracteres."
+                        errorMessage = AppText.get(R.string.la_contrasena_debe_tener_al)
                     }
                     password != confirmPassword -> {
-                        errorMessage = "Las contraseñas no coinciden."
+                        errorMessage = AppText.get(R.string.las_contrasenas_no_coinciden)
                     }
                     else -> {
                         onRegisterClick(
@@ -224,20 +231,20 @@ fun RegisterScreen(
                     }
                 }
             },
-            enabled = isFormValid
+            enabled = isFormValid && !isLoading
         )
 
         Spacer(modifier = Modifier.height(12.dp))
 
         TextButton(onClick = onLoginClick) {
             Text(
-                text = "¿Ya tienes cuenta? Inicia sesión",
+                text = stringResource(R.string.ya_tienes_cuenta_inicia_sesion),
                 color = LumiColors.Dark
             )
         }
 
         TextButton(onClick = onBackClick) {
-            Text("Volver", color = LumiColors.Dark)
+            Text(stringResource(R.string.volver), color = LumiColors.Dark)
         }
     }
 }

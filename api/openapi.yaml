@@ -1,0 +1,1797 @@
+openapi: 3.1.0
+info:
+  title: Lumi API
+  version: 1.4.0
+  summary: Contrato REST de Lumi para Cliente Android y Backend
+  description: |
+    Especificación derivada del Contrato de API Lumi v1.3 (26 páginas).
+    Versión 1.4.0: agrega POST /auth/google, GET /health, PUT /lessons/{id}/progress,
+    registro de dispositivos y ajustes de notificaciones, tipos de StoreItem,
+    esquema de /progress y el código QUOTA_EXCEEDED. Solo agrega; es compatible con 1.3.
+    Es una propuesta de trabajo para generar mocks y alinear Android/Backend.
+    Los valores y políticas marcados como provisionales deben confirmarse antes
+    de producción. PostgreSQL es una propuesta de persistencia, no un requisito
+    impuesto por OpenAPI.
+servers:
+  - url: https://{host}/api/v1
+    description: Ambiente configurable
+    variables:
+      host:
+        default: localhost:8000
+        description: Host del ambiente; en producción debe usar HTTPS.
+tags:
+  - name: Auth
+  - name: Profile
+  - name: Sync
+  - name: Semesters
+  - name: Subjects
+  - name: Tasks
+  - name: Study sessions
+  - name: Materials
+  - name: Learning
+  - name: Progress
+  - name: Store
+  - name: Notifications
+  - name: System
+security:
+  - bearerAuth: []
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Registrar usuario
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegisterRequest'}
+      responses:
+        '201':
+          description: Cuenta creada
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthResponse'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Iniciar sesión
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginRequest'}
+      responses:
+        '200':
+          description: Sesión iniciada
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthResponse'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /auth/google:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Iniciar sesión o registrarse con Google
+      description: |
+        Verifica el ID token de Google (firma, emisor, expiración, email_verified y
+        audiencia igual al ID de cliente Web de Lumi). Si el correo no existe se crea
+        la cuenta; si existe, se vincula. Responde igual que /auth/login.
+      operationId: loginWithGoogle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/GoogleLoginRequest'}
+      responses:
+        '200':
+          description: Sesión iniciada
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthResponse'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Renovar tokens
+      operationId: refreshTokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RefreshRequest'}
+      responses:
+        '200':
+          description: Tokens rotados
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthResponse'}
+        '401': {$ref: '#/components/responses/RefreshInvalid'}
+  /auth/logout:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Cerrar sesión
+      operationId: logout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RefreshRequest'}
+      responses:
+        '204': {description: Sesión revocada}
+        '401': {$ref: '#/components/responses/RefreshInvalid'}
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Consultar usuario autenticado
+      operationId: getAuthenticatedUser
+      responses:
+        '200':
+          description: Usuario actual
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/User'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /auth/password/forgot:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Solicitar recuperación de contraseña
+      operationId: requestPasswordReset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: {type: string, format: email}
+      responses:
+        '202': {description: Solicitud aceptada; la respuesta no revela si el correo existe}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /auth/password/reset:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Restablecer contraseña
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token: {type: string}
+                newPassword: {type: string, format: password, minLength: 8}
+      responses:
+        '204': {description: Contraseña restablecida}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /users/me:
+    get:
+      tags: [Profile]
+      summary: Consultar perfil
+      operationId: getProfile
+      responses:
+        '200':
+          description: Perfil
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/User'}
+    put:
+      tags: [Profile]
+      summary: Actualizar perfil
+      operationId: updateProfile
+      parameters: [{$ref: '#/components/parameters/IfMatch'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UpdateProfileRequest'}
+      responses:
+        '200':
+          description: Perfil actualizado
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/User'}
+        '409': {$ref: '#/components/responses/VersionConflict'}
+    delete:
+      tags: [Profile]
+      summary: Solicitar eliminación de cuenta y datos
+      operationId: deleteAccount
+      responses:
+        '202': {description: Solicitud de eliminación aceptada; política de gracia pendiente de confirmar}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /users/me/preferences:
+    get:
+      tags: [Profile]
+      summary: Consultar preferencias
+      operationId: getPreferences
+      responses:
+        '200':
+          description: Preferencias
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Preferences'}
+    put:
+      tags: [Profile]
+      summary: Actualizar preferencias
+      operationId: updatePreferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Preferences'}
+      responses:
+        '200':
+          description: Preferencias actualizadas
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Preferences'}
+  /sync/state:
+    get:
+      tags: [Sync]
+      summary: Obtener punto de lectura y orden de sincronización
+      operationId: getSyncState
+      responses:
+        '200':
+          description: Estado de sincronización
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SyncState'}
+  /semesters:
+    get:
+      tags: [Semesters]
+      summary: Listar y sincronizar semestres
+      operationId: listSemesters
+      parameters: [{$ref: '#/components/parameters/SyncToken'}, {$ref: '#/components/parameters/SyncRun'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200':
+          description: Página de semestres
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SemesterPage'}
+        '410': {$ref: '#/components/responses/SyncExpired'}
+    post:
+      tags: [Semesters]
+      summary: Crear semestre
+      operationId: createSemester
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SemesterInput'}
+      responses:
+        '201':
+          description: Semestre creado
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Semester'}
+  /semesters/{semesterId}:
+    parameters: [{$ref: '#/components/parameters/SemesterId'}]
+    get:
+      tags: [Semesters]
+      summary: Consultar semestre
+      operationId: getSemester
+      responses:
+        '200':
+          description: Semestre
+          headers: {ETag: {$ref: '#/components/headers/ETag'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Semester'}
+    put:
+      tags: [Semesters]
+      summary: Actualizar semestre
+      operationId: updateSemester
+      parameters: [{$ref: '#/components/parameters/IfMatch'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SemesterInput'}
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Semester'}
+        '409': {$ref: '#/components/responses/VersionConflict'}
+    delete:
+      tags: [Semesters]
+      summary: Eliminar semestre (borrado lógico)
+      operationId: deleteSemester
+      responses:
+        '204': {description: Eliminado lógicamente}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /subjects:
+    get:
+      tags: [Subjects]
+      summary: Listar y sincronizar materias
+      operationId: listSubjects
+      parameters: [{$ref: '#/components/parameters/SyncToken'}, {$ref: '#/components/parameters/SyncRun'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200':
+          description: Página de materias
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SubjectPage'}
+        '410': {$ref: '#/components/responses/SyncExpired'}
+    post:
+      tags: [Subjects]
+      summary: Crear materia
+      operationId: createSubject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SubjectInput'}
+      responses:
+        '201':
+          description: Materia creada
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Subject'}
+  /subjects/{subjectId}:
+    parameters: [{$ref: '#/components/parameters/SubjectId'}]
+    get:
+      tags: [Subjects]
+      summary: Consultar materia
+      operationId: getSubject
+      responses:
+        '200':
+          description: Materia
+          headers: {ETag: {$ref: '#/components/headers/ETag'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Subject'}
+    put:
+      tags: [Subjects]
+      summary: Actualizar materia
+      operationId: updateSubject
+      parameters: [{$ref: '#/components/parameters/IfMatch'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SubjectInput'}
+      responses:
+        '200':
+          description: Actualizada
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Subject'}
+        '409': {$ref: '#/components/responses/VersionConflict'}
+    delete:
+      tags: [Subjects]
+      summary: Eliminar materia (borrado lógico)
+      operationId: deleteSubject
+      responses:
+        '204': {description: Eliminada lógicamente}
+  /tasks:
+    get:
+      tags: [Tasks]
+      summary: Listar y sincronizar tareas
+      operationId: listTasks
+      parameters:
+        - {$ref: '#/components/parameters/SyncToken'}
+        - {$ref: '#/components/parameters/SyncRun'}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/Limit'}
+        - name: status
+          in: query
+          schema: {type: string, enum: [pending, completed]}
+        - name: subjectId
+          in: query
+          schema: {$ref: '#/components/schemas/UUID'}
+      responses:
+        '200':
+          description: Página de tareas
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TaskPage'}
+        '410': {$ref: '#/components/responses/SyncExpired'}
+    post:
+      tags: [Tasks]
+      summary: Crear tarea
+      operationId: createTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TaskInput'}
+      responses:
+        '201':
+          description: Tarea creada
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Task'}
+  /tasks/{taskId}:
+    parameters: [{$ref: '#/components/parameters/TaskId'}]
+    get:
+      tags: [Tasks]
+      summary: Consultar tarea
+      operationId: getTask
+      responses:
+        '200':
+          description: Tarea
+          headers: {ETag: {$ref: '#/components/headers/ETag'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Task'}
+    put:
+      tags: [Tasks]
+      summary: Actualizar tarea
+      operationId: updateTask
+      parameters: [{$ref: '#/components/parameters/IfMatch'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TaskInput'}
+      responses:
+        '200':
+          description: Actualizada
+          headers: {ETag: {$ref: '#/components/headers/ETag'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Task'}
+        '409': {$ref: '#/components/responses/VersionConflict'}
+    delete:
+      tags: [Tasks]
+      summary: Eliminar tarea (borrado lógico)
+      operationId: deleteTask
+      responses:
+        '204': {description: Eliminada lógicamente}
+  /tasks/{taskId}/complete:
+    parameters: [{$ref: '#/components/parameters/TaskId'}]
+    patch:
+      tags: [Tasks]
+      summary: Completar tarea
+      operationId: completeTask
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [completedAt, timeZone]
+              properties:
+                completedAt: {$ref: '#/components/schemas/Instant'}
+                timeZone: {$ref: '#/components/schemas/TimeZone'}
+      responses:
+        '200':
+          description: Tarea completada y resultado de recompensa
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TaskCompletionResponse'}
+        '410': {$ref: '#/components/responses/ResourceDeleted'}
+  /tasks/{taskId}/reopen:
+    parameters: [{$ref: '#/components/parameters/TaskId'}]
+    patch:
+      tags: [Tasks]
+      summary: Reabrir tarea
+      operationId: reopenTask
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      responses:
+        '200':
+          description: Tarea reabierta; no revierte recompensas previas
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TaskCompletionResponse'}
+  /tasks/{taskId}/subtasks:
+    parameters: [{$ref: '#/components/parameters/TaskId'}]
+    post:
+      tags: [Tasks]
+      summary: Crear subtarea
+      operationId: createSubtask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SubtaskInput'}
+      responses:
+        '201':
+          description: Subtarea creada
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Subtask'}
+  /tasks/{taskId}/subtasks/{subtaskId}:
+    parameters:
+      - {$ref: '#/components/parameters/TaskId'}
+      - name: subtaskId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    put:
+      tags: [Tasks]
+      summary: Actualizar subtarea
+      operationId: updateSubtask
+      parameters: [{$ref: '#/components/parameters/IfMatch'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SubtaskInput'}
+      responses:
+        '200': {description: Subtarea actualizada}
+        '409': {$ref: '#/components/responses/VersionConflict'}
+    delete:
+      tags: [Tasks]
+      summary: Eliminar subtarea (borrado lógico)
+      operationId: deleteSubtask
+      responses:
+        '204': {description: Subtarea eliminada}
+  /study-sessions:
+    get:
+      tags: [Study sessions]
+      summary: Listar sesiones de estudio
+      operationId: listStudySessions
+      parameters: [{$ref: '#/components/parameters/SyncToken'}, {$ref: '#/components/parameters/SyncRun'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200':
+          description: Página de sesiones
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StudySessionPage'}
+        '410': {$ref: '#/components/responses/SyncExpired'}
+    post:
+      tags: [Study sessions]
+      summary: Registrar sesión
+      operationId: createStudySession
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StudySessionInput'}
+      responses:
+        '201':
+          description: Sesión registrada
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StudySessionResponse'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /study-sessions/{sessionId}:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    get:
+      tags: [Study sessions]
+      summary: Consultar sesión
+      operationId: getStudySession
+      responses:
+        '200':
+          description: Sesión
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StudySession'}
+  /study-sessions/statistics:
+    get:
+      tags: [Study sessions]
+      summary: Consultar estadísticas de estudio
+      operationId: getStudyStatistics
+      responses:
+        '200':
+          description: Estadísticas
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /materials:
+    get:
+      tags: [Materials]
+      summary: Listar y sincronizar materiales
+      operationId: listMaterials
+      parameters: [{$ref: '#/components/parameters/SyncToken'}, {$ref: '#/components/parameters/SyncRun'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200':
+          description: Página de materiales
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MaterialPage'}
+        '410': {$ref: '#/components/responses/SyncExpired'}
+    post:
+      tags: [Materials]
+      summary: Crear material de texto
+      operationId: createTextMaterial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TextMaterialInput'}
+      responses:
+        '201':
+          description: Material creado
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Material'}
+  /materials/upload:
+    post:
+      tags: [Materials]
+      summary: Subir PDF
+      operationId: uploadPdf
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+                title: {type: string}
+      responses:
+        '201':
+          description: PDF cargado
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Material'}
+        '413': {$ref: '#/components/responses/FileTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedFile'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /materials/{materialId}:
+    parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    get:
+      tags: [Materials]
+      summary: Consultar material
+      operationId: getMaterial
+      responses:
+        '200':
+          description: Material
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Material'}
+    delete:
+      tags: [Materials]
+      summary: Eliminar material
+      operationId: deleteMaterial
+      responses:
+        '204': {description: Material eliminado lógicamente}
+  /materials/{materialId}/process:
+    parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    post:
+      tags: [Materials]
+      summary: Encolar procesamiento
+      operationId: processMaterial
+      responses:
+        '202':
+          description: Procesamiento aceptado
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProcessingStatus'}
+  /materials/{materialId}/processing:
+    parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    get:
+      tags: [Materials]
+      summary: Consultar estado de procesamiento
+      operationId: getMaterialProcessing
+      responses:
+        '200':
+          description: Estado
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProcessingStatus'}
+  /materials/{materialId}/retry:
+    parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    post:
+      tags: [Materials]
+      summary: Reintentar procesamiento fallido
+      operationId: retryMaterialProcessing
+      responses:
+        '202':
+          description: Reintento aceptado
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProcessingStatus'}
+  /materials/{materialId}/topics:
+    parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    get:
+      tags: [Learning]
+      summary: Consultar temas y subtemas
+      operationId: listMaterialTopics
+      responses:
+        '200':
+          description: Temas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/LearningSection'}
+  /materials/{materialId}/lessons:
+    parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    get:
+      tags: [Learning]
+      summary: Listar lecciones
+      operationId: listLessons
+      responses:
+        '200':
+          description: Lecciones
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/Lesson'}
+  /materials/{materialId}/flashcards:
+    parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    get:
+      tags: [Learning]
+      summary: Listar flashcards
+      operationId: listFlashcards
+      responses:
+        '200':
+          description: Flashcards
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/Flashcard'}
+  /materials/{materialId}/quizzes:
+    parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    get:
+      tags: [Learning]
+      summary: Listar cuestionarios
+      operationId: listQuizzes
+      responses:
+        '200':
+          description: Cuestionarios
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/Quiz'}
+  /lessons/{lessonId}:
+    parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    get:
+      tags: [Learning]
+      summary: Consultar lección
+      operationId: getLesson
+      responses:
+        '200':
+          description: Lección
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Lesson'}
+  /lessons/{lessonId}/complete:
+    parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    post:
+      tags: [Learning]
+      summary: Completar lección
+      operationId: completeLesson
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [completedAt]
+              properties:
+                completedAt: {$ref: '#/components/schemas/Instant'}
+      responses:
+        '200':
+          description: Progreso y recompensa
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LearningActionResponse'}
+        '410': {$ref: '#/components/responses/ResourceDeleted'}
+  /lessons/{lessonId}/progress:
+    parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    put:
+      tags: [Learning]
+      summary: Guardar avance de una lección
+      description: Idempotente por naturaleza; guardar el mismo porcentaje dos veces no cambia el resultado. No otorga recompensa (eso lo hace /complete).
+      operationId: saveLessonProgress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [progressPercent]
+              properties:
+                progressPercent: {type: integer, minimum: 0, maximum: 100}
+      responses:
+        '200':
+          description: Avance guardado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [lessonId, progressPercent]
+                properties:
+                  lessonId: {$ref: '#/components/schemas/UUID'}
+                  progressPercent: {type: integer, minimum: 0, maximum: 100}
+        '410': {$ref: '#/components/responses/ResourceDeleted'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /flashcards/{flashcardId}/reviews:
+    parameters:
+      - name: flashcardId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    post:
+      tags: [Learning]
+      summary: Registrar repaso de flashcard
+      operationId: reviewFlashcard
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reviewedAt, result]
+              properties:
+                reviewedAt: {$ref: '#/components/schemas/Instant'}
+                result: {type: string, enum: [remembered, difficult, forgotten]}
+      responses:
+        '200':
+          description: Repaso registrado
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LearningActionResponse'}
+        '410': {$ref: '#/components/responses/ResourceDeleted'}
+  /quizzes/{quizId}/attempts:
+    parameters:
+      - name: quizId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    get:
+      tags: [Learning]
+      summary: Consultar intentos de cuestionario
+      operationId: listQuizAttempts
+      responses:
+        '200':
+          description: Intentos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/QuizAttempt'}
+    post:
+      tags: [Learning]
+      summary: Enviar intento de cuestionario (requiere conexión)
+      operationId: submitQuizAttempt
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/QuizAttemptInput'}
+      responses:
+        '200':
+          description: Intento evaluado
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/QuizAttemptResponse'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /progress:
+    get:
+      tags: [Progress]
+      summary: Consultar progreso general
+      operationId: getProgress
+      responses:
+        '200':
+          description: Progreso
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProgressSummary'}
+  /progress/weekly:
+    get:
+      tags: [Progress]
+      summary: Consultar actividad semanal
+      operationId: getWeeklyProgress
+      responses:
+        '200':
+          description: Actividad semanal
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /progress/streak:
+    get:
+      tags: [Progress]
+      summary: Consultar racha
+      operationId: getStreak
+      responses:
+        '200':
+          description: Racha
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Streak'}
+  /progress/achievements:
+    get:
+      tags: [Progress]
+      summary: Consultar logros
+      operationId: getAchievements
+      responses:
+        '200':
+          description: Logros
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: {type: object, additionalProperties: true}
+  /wallet:
+    get:
+      tags: [Progress]
+      summary: Consultar saldo
+      operationId: getWallet
+      responses:
+        '200':
+          description: Saldo
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Wallet'}
+  /wallet/transactions:
+    get:
+      tags: [Progress]
+      summary: Consultar movimientos
+      operationId: listWalletTransactions
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200':
+          description: Movimientos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: {type: object, additionalProperties: true}
+                  nextCursor: {type: [string, 'null']}
+                  hasMore: {type: boolean}
+  /store/items:
+    get:
+      tags: [Store]
+      summary: Consultar catálogo
+      operationId: listStoreItems
+      responses:
+        '200':
+          description: Catálogo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/StoreItem'}
+  /store/purchases:
+    get:
+      tags: [Store]
+      summary: Consultar historial de compras
+      operationId: listStorePurchases
+      responses:
+        '200':
+          description: Compras
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: {type: object, additionalProperties: true}
+    post:
+      tags: [Store]
+      summary: Comprar artículo
+      operationId: purchaseStoreItem
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemId, quantity]
+              properties:
+                itemId: {$ref: '#/components/schemas/UUID'}
+                quantity: {type: integer, minimum: 1}
+      responses:
+        '200':
+          description: Compra realizada
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PurchaseResponse'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /store/inventory:
+    get:
+      tags: [Store]
+      summary: Consultar inventario
+      operationId: getInventory
+      responses:
+        '200':
+          description: Inventario
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/InventoryItem'}
+  /store/inventory/{itemId}/use:
+    parameters:
+      - name: itemId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+    post:
+      tags: [Store]
+      summary: Usar artículo del inventario
+      operationId: useInventoryItem
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity: {type: integer, minimum: 1}
+                context:
+                  type: object
+                  properties:
+                    activityDate: {$ref: '#/components/schemas/LocalDate'}
+      responses:
+        '200':
+          description: Artículo utilizado
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UseItemResponse'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /notifications/devices:
+    post:
+      tags: [Notifications]
+      summary: Registrar o actualizar el token FCM del dispositivo
+      operationId: registerDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DeviceRegistration'}
+      responses:
+        '204':
+          description: Dispositivo registrado
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /notifications/devices/{deviceId}:
+    parameters:
+      - name: deviceId
+        in: path
+        required: true
+        schema: {type: string}
+    delete:
+      tags: [Notifications]
+      summary: Dar de baja un dispositivo
+      operationId: unregisterDevice
+      responses:
+        '204':
+          description: Dispositivo dado de baja
+  /users/me/notification-settings:
+    get:
+      tags: [Notifications]
+      summary: Consultar ajustes de notificaciones
+      operationId: getNotificationSettings
+      responses:
+        '200':
+          description: Ajustes
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationSettings'}
+    put:
+      tags: [Notifications]
+      summary: Actualizar ajustes de notificaciones
+      operationId: updateNotificationSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NotificationSettings'}
+      responses:
+        '200':
+          description: Ajustes guardados
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationSettings'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /health:
+    get:
+      tags: [System]
+      security: []
+      summary: Estado del servicio
+      description: Sin autenticación. Sirve para monitoreo y para calentar el servicio antes de una demo.
+      operationId: getHealth
+      responses:
+        '200':
+          description: Servicio operativo o degradado
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Health'}
+        '503':
+          description: Servicio no disponible
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Health'}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: ETag de la versión que el cliente leyó.
+      schema: {type: string}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, format: uuid}
+    SyncToken:
+      name: syncToken
+      in: query
+      required: false
+      schema: {type: string}
+    SyncRun:
+      name: syncRun
+      in: query
+      required: false
+      schema: {type: string}
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema: {type: string}
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema: {type: integer, minimum: 1, maximum: 100, default: 100}
+    SemesterId:
+      name: semesterId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/UUID'}
+    SubjectId:
+      name: subjectId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/UUID'}
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/UUID'}
+  headers:
+    ETag:
+      description: Identificador opaco de la versión del recurso.
+      schema: {type: string}
+  responses:
+    Unauthorized:
+      description: No autenticado o access token expirado
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+    RefreshInvalid:
+      description: Refresh token inválido o revocado
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+    Conflict:
+      description: Conflicto de recurso o clave idempotente
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+    VersionConflict:
+      description: La versión del recurso está desactualizada
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+    ValidationError:
+      description: Validación fallida
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+    RateLimited:
+      description: Límite de peticiones o cuota excedidos
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+    SyncExpired:
+      description: syncToken o syncRunToken expirado
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+    ResourceDeleted:
+      description: El recurso fue eliminado
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+    FileTooLarge:
+      description: Archivo demasiado grande
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+    UnsupportedFile:
+      description: Tipo de archivo no admitido
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+  schemas:
+    UUID: {type: string, format: uuid}
+    Instant: {type: string, format: date-time, description: Instante ISO 8601 UTC terminado en Z.}
+    LocalDate: {type: string, format: date}
+    TimeZone: {type: string, example: America/Monterrey, description: Identificador de zona horaria IANA.}
+    RegisterRequest:
+      type: object
+      required: [name, email, password, timeZone]
+      properties:
+        name: {type: string, minLength: 1}
+        email: {type: string, format: email}
+        password: {type: string, format: password, minLength: 8}
+        timeZone: {$ref: '#/components/schemas/TimeZone'}
+        selectedGoals:
+          type: array
+          items: {type: string}
+        dailyGoalMinutes: {type: integer, minimum: 1}
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: {type: string, format: email}
+        password: {type: string, format: password}
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: {type: string}
+    GoogleLoginRequest:
+      type: object
+      required: [idToken]
+      properties:
+        idToken: {type: string, description: ID token JWT emitido por Google Sign-In.}
+    ProgressSummary:
+      type: object
+      required: [totalStudyMinutes, completedTasks, currentStreak, longestStreak, level]
+      properties:
+        totalStudyMinutes: {type: integer, minimum: 0}
+        completedTasks: {type: integer, minimum: 0}
+        currentStreak: {type: integer, minimum: 0}
+        longestStreak: {type: integer, minimum: 0}
+        level: {type: integer, minimum: 1}
+        xp: {type: integer, minimum: 0}
+      additionalProperties: true
+    DeviceRegistration:
+      type: object
+      required: [deviceId, fcmToken, platform]
+      properties:
+        deviceId: {type: string}
+        fcmToken: {type: string}
+        platform: {type: string, enum: [android]}
+        locale: {type: string, examples: [es, en]}
+    NotificationSettings:
+      type: object
+      required: [studyReminder, taskDue, streakAtRisk]
+      properties:
+        studyReminder: {type: boolean}
+        taskDue: {type: boolean}
+        streakAtRisk: {type: boolean}
+        reminderTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          description: Hora local HH:mm del recordatorio de estudio.
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string, enum: [ok, degraded, down]}
+        version: {type: string}
+        database: {type: string, enum: [ok, down]}
+        queue: {type: string, enum: [ok, down, not_configured]}
+        time: {$ref: '#/components/schemas/Instant'}
+    AuthResponse:
+      type: object
+      required: [accessToken, refreshToken, expiresIn, user]
+      properties:
+        accessToken: {type: string}
+        refreshToken: {type: string}
+        expiresIn: {type: integer, description: Vigencia del access token en segundos.}
+        user: {$ref: '#/components/schemas/User'}
+    User:
+      type: object
+      required: [id, name, email, timeZone]
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        name: {type: string}
+        email: {type: string, format: email}
+        timeZone: {$ref: '#/components/schemas/TimeZone'}
+        version: {type: integer}
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name: {type: string}
+        timeZone: {$ref: '#/components/schemas/TimeZone'}
+    Preferences:
+      type: object
+      properties:
+        selectedGoals:
+          type: array
+          items: {type: string}
+        dailyGoalMinutes: {type: integer, minimum: 1}
+    SyncState:
+      type: object
+      required: [serverTime, syncRunToken, expiresAt, collections]
+      properties:
+        serverTime: {$ref: '#/components/schemas/Instant'}
+        syncRunToken: {type: string}
+        expiresAt: {$ref: '#/components/schemas/Instant'}
+        collections:
+          type: array
+          items:
+            type: object
+            required: [name, order]
+            properties:
+              name: {type: string, enum: [semesters, subjects, tasks, study-sessions, materials]}
+              order: {type: integer}
+    PageMeta:
+      type: object
+      required: [nextCursor, hasMore, syncToken, serverTime]
+      properties:
+        nextCursor: {type: [string, 'null']}
+        hasMore: {type: boolean}
+        syncToken: {type: string}
+        serverTime: {$ref: '#/components/schemas/Instant'}
+    Semester:
+      type: object
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        name: {type: string}
+        startDate: {$ref: '#/components/schemas/LocalDate'}
+        endDate: {$ref: '#/components/schemas/LocalDate'}
+        version: {type: integer}
+        createdAt: {$ref: '#/components/schemas/Instant'}
+        updatedAt: {$ref: '#/components/schemas/Instant'}
+        deletedAt: {oneOf: [{$ref: '#/components/schemas/Instant'}, {type: 'null'}]}
+    SemesterInput:
+      type: object
+      required: [id, name]
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        name: {type: string}
+        startDate: {$ref: '#/components/schemas/LocalDate'}
+        endDate: {$ref: '#/components/schemas/LocalDate'}
+    SemesterPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/Semester'}}
+    Subject:
+      type: object
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        name: {type: string}
+        description: {type: [string, 'null']}
+        color: {type: string}
+        semesterId: {oneOf: [{$ref: '#/components/schemas/UUID'}, {type: 'null'}]}
+        status: {type: string, enum: [active, archived]}
+        version: {type: integer}
+        createdAt: {$ref: '#/components/schemas/Instant'}
+        updatedAt: {$ref: '#/components/schemas/Instant'}
+        deletedAt: {oneOf: [{$ref: '#/components/schemas/Instant'}, {type: 'null'}]}
+    SubjectInput:
+      type: object
+      required: [id, name]
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        name: {type: string}
+        description: {type: [string, 'null']}
+        color: {type: string}
+        semesterId: {oneOf: [{$ref: '#/components/schemas/UUID'}, {type: 'null'}]}
+        status: {type: string, enum: [active, archived]}
+    SubjectPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/Subject'}}
+    Subtask:
+      type: object
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        title: {type: string}
+        completed: {type: boolean}
+        version: {type: integer}
+        deletedAt: {oneOf: [{$ref: '#/components/schemas/Instant'}, {type: 'null'}]}
+    SubtaskInput:
+      type: object
+      required: [id, title]
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        title: {type: string}
+        completed: {type: boolean}
+    Task:
+      type: object
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        title: {type: string}
+        description: {type: [string, 'null']}
+        subjectId: {oneOf: [{$ref: '#/components/schemas/UUID'}, {type: 'null'}]}
+        dueDate: {oneOf: [{$ref: '#/components/schemas/LocalDate'}, {type: 'null'}]}
+        dueTime: {type: [string, 'null'], pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'}
+        allDay: {type: boolean}
+        timeZone: {$ref: '#/components/schemas/TimeZone'}
+        priority: {type: string, enum: [low, medium, high]}
+        status: {type: string, enum: [pending, completed]}
+        subtasks: {type: array, items: {$ref: '#/components/schemas/Subtask'}}
+        completedAt: {oneOf: [{$ref: '#/components/schemas/Instant'}, {type: 'null'}]}
+        rewardedAt: {oneOf: [{$ref: '#/components/schemas/Instant'}, {type: 'null'}]}
+        version: {type: integer}
+        createdAt: {$ref: '#/components/schemas/Instant'}
+        updatedAt: {$ref: '#/components/schemas/Instant'}
+        deletedAt: {oneOf: [{$ref: '#/components/schemas/Instant'}, {type: 'null'}]}
+    TaskInput:
+      type: object
+      required: [id, title, allDay, priority]
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        title: {type: string}
+        description: {type: [string, 'null']}
+        subjectId: {oneOf: [{$ref: '#/components/schemas/UUID'}, {type: 'null'}]}
+        dueDate: {oneOf: [{$ref: '#/components/schemas/LocalDate'}, {type: 'null'}]}
+        dueTime:
+          type: [string, 'null']
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          description: Hora local HH:mm de 24 horas; nulo si allDay es true.
+        allDay: {type: boolean}
+        timeZone: {$ref: '#/components/schemas/TimeZone'}
+        priority: {type: string, enum: [low, medium, high]}
+        subtasks:
+          type: array
+          description: En PUT reemplaza la lista guardada; las subtareas ausentes se eliminan.
+          items: {$ref: '#/components/schemas/SubtaskInput'}
+    TaskPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/Task'}}
+    Wallet:
+      type: object
+      properties:
+        xp: {type: integer}
+        gems: {type: integer}
+    Streak:
+      type: object
+      properties:
+        current: {type: integer}
+        longest: {type: integer}
+    RewardResult:
+      type: object
+      required: [status, xpAwarded, gemsAwarded]
+      properties:
+        status: {type: string, enum: [confirmed, not_granted]}
+        reason:
+          type: string
+          enum: [ALREADY_REWARDED, OUTSIDE_OFFLINE_WINDOW, DAILY_LIMIT_REACHED, NOT_ELIGIBLE, SESSION_TOO_SHORT, SESSION_INCOMPLETE, SESSION_OVERLAP]
+        xpAwarded: {type: integer}
+        gemsAwarded: {type: integer}
+        wallet: {$ref: '#/components/schemas/Wallet'}
+        streak: {$ref: '#/components/schemas/Streak'}
+    TaskCompletionResponse:
+      type: object
+      properties:
+        task: {$ref: '#/components/schemas/Task'}
+        rewardResult: {$ref: '#/components/schemas/RewardResult'}
+    StudySessionInput:
+      type: object
+      required: [id, mode, startedAt, endedAt, pausedSeconds, timeZone]
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        subjectId: {oneOf: [{$ref: '#/components/schemas/UUID'}, {type: 'null'}]}
+        mode: {type: string, enum: [pomodoro, free]}
+        plannedMinutes: {type: integer, minimum: 1}
+        pausedSeconds: {type: integer, minimum: 0}
+        startedAt: {$ref: '#/components/schemas/Instant'}
+        endedAt: {$ref: '#/components/schemas/Instant'}
+        timeZone: {$ref: '#/components/schemas/TimeZone'}
+    StudySession:
+      allOf:
+        - {$ref: '#/components/schemas/StudySessionInput'}
+        - type: object
+          properties:
+            durationMinutes: {type: integer}
+            status: {type: string, enum: [accepted]}
+            version: {type: integer}
+            updatedAt: {$ref: '#/components/schemas/Instant'}
+            deletedAt: {oneOf: [{$ref: '#/components/schemas/Instant'}, {type: 'null'}]}
+    StudySessionResponse:
+      type: object
+      properties:
+        session: {$ref: '#/components/schemas/StudySession'}
+        rewardResult: {$ref: '#/components/schemas/RewardResult'}
+    StudySessionPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/StudySession'}}
+    Material:
+      type: object
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        title: {type: string}
+        type: {type: string, enum: [text, pdf]}
+        status: {type: string, enum: [pending, processing, completed, failed]}
+        version: {type: integer}
+        createdAt: {$ref: '#/components/schemas/Instant'}
+        updatedAt: {$ref: '#/components/schemas/Instant'}
+        deletedAt: {oneOf: [{$ref: '#/components/schemas/Instant'}, {type: 'null'}]}
+    TextMaterialInput:
+      type: object
+      required: [id, title, content]
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        title: {type: string}
+        content: {type: string}
+    MaterialPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/Material'}}
+    ProcessingStatus:
+      type: object
+      properties:
+        materialId: {$ref: '#/components/schemas/UUID'}
+        processingJobId: {$ref: '#/components/schemas/UUID'}
+        status: {type: string, enum: [pending, processing, completed, failed]}
+        progressPercent: {type: integer, minimum: 0, maximum: 100}
+        stage: {type: string, enum: [file_validation, text_extraction, ocr, segmentation, content_generation, indexing]}
+    SourceReference:
+      type: object
+      properties:
+        page: {type: integer, minimum: 1}
+        quote: {type: string}
+        origin: {type: string, enum: [extracted]}
+    LearningExample:
+      type: object
+      properties:
+        title: {type: string}
+        content: {type: string}
+        origin: {type: string, enum: [extracted, generated]}
+    LearningSection:
+      type: object
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        title: {type: string}
+        explanation: {type: string}
+        origin: {type: string, enum: [extracted, generated]}
+        sourceReferences:
+          type: array
+          items: {$ref: '#/components/schemas/SourceReference'}
+        examples:
+          type: array
+          items: {$ref: '#/components/schemas/LearningExample'}
+    Lesson:
+      allOf:
+        - {$ref: '#/components/schemas/LearningSection'}
+        - type: object
+          properties:
+            materialId: {$ref: '#/components/schemas/UUID'}
+    Flashcard:
+      type: object
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        question: {type: string}
+        answer: {type: string}
+        origin: {type: string, enum: [extracted, generated]}
+        sourceReferences:
+          type: array
+          items: {$ref: '#/components/schemas/SourceReference'}
+        sourcePage: {type: integer}
+    QuizOption:
+      type: object
+      required: [optionId, text]
+      properties:
+        optionId: {type: string}
+        text: {type: string}
+    QuizQuestion:
+      type: object
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        type: {type: string, enum: [multiple_choice]}
+        question: {type: string}
+        options:
+          type: array
+          items: {$ref: '#/components/schemas/QuizOption'}
+    Quiz:
+      type: object
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        title: {type: string}
+        questions:
+          type: array
+          items: {$ref: '#/components/schemas/QuizQuestion'}
+    QuizAttemptInput:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          items:
+            type: object
+            required: [questionId, selectedOptionIds]
+            properties:
+              questionId: {$ref: '#/components/schemas/UUID'}
+              selectedOptionIds:
+                type: array
+                items: {type: string}
+    QuizAttempt:
+      type: object
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        score: {type: number, minimum: 0, maximum: 100}
+        submittedAt: {$ref: '#/components/schemas/Instant'}
+    QuizAttemptResponse:
+      type: object
+      properties:
+        attempt: {$ref: '#/components/schemas/QuizAttempt'}
+        feedback:
+          type: array
+          items:
+            type: object
+            properties:
+              questionId: {$ref: '#/components/schemas/UUID'}
+              correct: {type: boolean}
+              explanation: {type: string}
+        rewardResult: {$ref: '#/components/schemas/RewardResult'}
+    LearningActionResponse:
+      type: object
+      properties:
+        progress: {type: object, additionalProperties: true}
+        rewardResult: {$ref: '#/components/schemas/RewardResult'}
+    StoreItem:
+      type: object
+      properties:
+        id: {$ref: '#/components/schemas/UUID'}
+        name: {type: string}
+        description: {type: string}
+        priceGems: {type: integer}
+        type: {type: string, enum: [avatar, theme, boost, streak_freeze, cosmetic]}
+        effects: {type: object, additionalProperties: true}
+    InventoryItem:
+      type: object
+      properties:
+        itemId: {$ref: '#/components/schemas/UUID'}
+        quantity: {type: integer, minimum: 0}
+    PurchaseResponse:
+      type: object
+      properties:
+        purchase: {type: object, additionalProperties: true}
+        wallet: {$ref: '#/components/schemas/Wallet'}
+        inventory: {$ref: '#/components/schemas/InventoryItem'}
+    UseItemResponse:
+      type: object
+      properties:
+        use:
+          type: object
+          properties:
+            id: {$ref: '#/components/schemas/UUID'}
+            itemId: {$ref: '#/components/schemas/UUID'}
+            quantity: {type: integer}
+            usedAt: {$ref: '#/components/schemas/Instant'}
+        inventory: {$ref: '#/components/schemas/InventoryItem'}
+        effect:
+          type: object
+          properties:
+            type: {type: string}
+            status: {type: string, enum: [applied, active]}
+            activityDate: {$ref: '#/components/schemas/LocalDate'}
+            multiplier: {type: number}
+            startsAt: {$ref: '#/components/schemas/Instant'}
+            expiresAt: {$ref: '#/components/schemas/Instant'}
+        streak: {$ref: '#/components/schemas/Streak'}
+    ApiError:
+      type: object
+      required: [code, message, requestId]
+      properties:
+        code:
+          type: string
+          description: |
+            Códigos usados incluyen UNAUTHORIZED, VALIDATION_ERROR, VERSION_CONFLICT,
+            RESOURCE_DELETED, RATE_LIMITED y QUOTA_EXCEEDED (límite de la IA, con 429).
+        message: {type: string, description: Localizado según Accept-Language (es, en).}
+        details: {type: object, additionalProperties: true}
+        requestId: {$ref: '#/components/schemas/UUID'}
