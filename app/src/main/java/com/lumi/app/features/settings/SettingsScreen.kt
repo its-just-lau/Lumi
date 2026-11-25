@@ -1,6 +1,7 @@
 package com.lumi.app.features.settings
 
 import android.content.Intent
+import com.lumi.app.core.i18n.AppText
 import android.net.Uri
 import android.provider.Settings
 import android.os.Build
@@ -78,10 +79,10 @@ fun SettingsScreen(
                                 }
                             )
                         } catch (_: Exception) {
-                            Toast.makeText(context, context.getString(R.string.language_unavailable), Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, AppText.get(R.string.language_unavailable), Toast.LENGTH_LONG).show()
                         }
                     } else {
-                        Toast.makeText(context, context.getString(R.string.language_unavailable), Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, AppText.get(R.string.language_unavailable), Toast.LENGTH_LONG).show()
                     }
                 }
             )
@@ -102,14 +103,14 @@ fun SettingsScreen(
                 onClick = {
                     val intent = Intent(Intent.ACTION_SENDTO).apply {
                         data = Uri.parse("mailto:$SUPPORT_EMAIL")
-                        putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.feedback_subject))
+                        putExtra(Intent.EXTRA_SUBJECT, AppText.get(R.string.feedback_subject))
                     }
                     try {
                         context.startActivity(intent)
                     } catch (_: Exception) {
                         Toast.makeText(
                             context,
-                            context.getString(R.string.no_mail_app),
+                            AppText.get(R.string.no_mail_app),
                             Toast.LENGTH_SHORT
                         ).show()
                     }

@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.RawRes
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -55,29 +56,12 @@ fun MascotAnimation(
     }
 
     DisposableEffect(drawable) {
-        val handler = Handler(Looper.getMainLooper())
-        val animated = drawable as? AnimatedImageDrawable
-        if (animated != null) {
-            animated.callback = object : Drawable.Callback {
-                override fun invalidateDrawable(who: Drawable) {
-                    frameTick++
-                }
-
-                override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
-                    handler.postAtTime(what, `when`)
-                }
-
-                override fun unscheduleDrawable(who: Drawable, what: Runnable) {
-                    handler.removeCallbacks(what)
-                }
-            }
-            animated.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
-            animated.start()
+        val stop = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            startAnimation(drawable) { frameTick++ }
+        } else {
+            null
         }
-        onDispose {
-            animated?.stop()
-            animated?.callback = null
-        }
+        onDispose { stop?.invoke() }
     }
 
     val semanticsModifier = if (contentDescription != null) {
@@ -101,5 +85,33 @@ fun MascotAnimation(
 
         d.setBounds(left, top, left + w, top + h)
         drawIntoCanvas { canvas -> d.draw(canvas.nativeCanvas) }
+    }
+}
+
+/** Inicia la animación en bucle (API 28+) y devuelve una función que la detiene. */
+@RequiresApi(Build.VERSION_CODES.P)
+private fun startAnimation(drawable: Drawable?, onFrame: () -> Unit): () -> Unit {
+    val animated = drawable as? AnimatedImageDrawable ?: return {}
+    val handler = Handler(Looper.getMainLooper())
+
+    animated.callback = object : Drawable.Callback {
+        override fun invalidateDrawable(who: Drawable) {
+            onFrame()
+        }
+
+        override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
+            handler.postAtTime(what, `when`)
+        }
+
+        override fun unscheduleDrawable(who: Drawable, what: Runnable) {
+            handler.removeCallbacks(what)
+        }
+    }
+    animated.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
+    animated.start()
+
+    return {
+        animated.stop()
+        animated.callback = null
     }
 }

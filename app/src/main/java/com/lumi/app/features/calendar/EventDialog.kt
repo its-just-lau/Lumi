@@ -50,7 +50,7 @@ fun EventDialog(
     var error by remember { mutableStateOf<String?>(null) }
 
     val dateText = date.format(
-        DateTimeFormatter.ofPattern(AppText.get(R.string.pattern_event_date), Locale.getDefault())
+        DateTimeFormatter.ofPattern(AppText.get(R.string.pattern_event_date), androidx.compose.ui.text.intl.Locale.current.platformLocale)
     ).replaceFirstChar { it.uppercase() }
 
     AlertDialog(

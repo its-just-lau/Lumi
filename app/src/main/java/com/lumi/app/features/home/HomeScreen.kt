@@ -599,7 +599,7 @@ fun HomeScreen(
                                 text = displayedMonth.month
                                     .getDisplayName(
                                         java.time.format.TextStyle.FULL,
-                                        Locale.getDefault()
+                                        androidx.compose.ui.text.intl.Locale.current.platformLocale
                                     )
                                     .replaceFirstChar {
                                         it.uppercase()
