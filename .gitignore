@@ -1,21 +1,55 @@
-
-# Gradle
-.gradle/
-**/build/
-
-# Android Studio
-.idea/
-
-# Local configuration
+# Secretos y entorno local
+.env
+.env.*
+!.env.example
 local.properties
-*.iml
+*.jks
+*.keystore
+*.pem
+*.p12
+credentials*.json
+service-account*.json
+*firebase-adminsdk*.json
+google-services.json
 
-# Kotlin
+# Markdown: solo README se versiona (y docs/ia por excepción)
+*.md
+!README.md
+!backend/README.md
+!docs/ia/
+!docs/ia/*.md
+reportes/
+
+# Agente de IA y plan de trabajo locales
+AGENTS.md
+PLAN_EJECUTOR.md
+PLAN_EJECUTOR_LUMI.md
+opencode.json
+.opencode/
+
+# Android
+build/
+.gradle/
 .kotlin/
-
-# Logs
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
 *.log
 
-# Operating system
+# Python / backend
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+backend/.env
+backend/.venv/
+
+# Sistema
 .DS_Store
 Thumbs.db
