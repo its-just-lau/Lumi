@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lumi.app.core.components.LumiButton
+import com.lumi.app.features.auth.components.GoogleSignInButton
 import com.lumi.app.ui.theme.LumiColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
@@ -30,16 +31,24 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.res.stringResource
+import com.lumi.app.R
+import com.lumi.app.core.i18n.AppText
 
 @Composable
 fun LoginScreen(
     onLoginClick: (String, String) -> Unit,
     onRegisterClick: () -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onForgotPasswordClick: () -> Unit = {},
+    onGoogleIdToken: (String) -> Unit = {},
+    isLoading: Boolean = false,
+    errorMessage: String? = null
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var googleError by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
@@ -50,7 +59,7 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Lumi",
+            text = stringResource(R.string.lumi),
             fontSize = 42.sp,
             fontWeight = FontWeight.ExtraBold,
             color = LumiColors.Dark
@@ -59,14 +68,14 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "¡Qué bueno verte de nuevo!",
+            text = stringResource(R.string.que_bueno_verte_de_nuevo),
             style = MaterialTheme.typography.headlineMedium,
             color = LumiColors.Dark,
             textAlign = TextAlign.Center
         )
 
         Text(
-            text = "Inicia sesión para continuar aprendiendo.",
+            text = stringResource(R.string.inicia_sesion_para_continuar_aprendiendo),
             style = MaterialTheme.typography.bodyMedium,
             color = LumiColors.Dark,
             textAlign = TextAlign.Center
@@ -78,7 +87,7 @@ fun LoginScreen(
             value = email,
             onValueChange = { email = it },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Correo electrónico") },
+            label = { Text(stringResource(R.string.correo_electronico)) },
             placeholder = { Text("ejemplo@correo.com") },
             singleLine = true,
             shape = RoundedCornerShape(14.dp)
@@ -90,7 +99,7 @@ fun LoginScreen(
             value = password,
             onValueChange = { password = it },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Contraseña") },
+            label = { Text(stringResource(R.string.contrasena)) },
             singleLine = true,
             visualTransformation = if (passwordVisible) {
                 VisualTransformation.None
@@ -108,9 +117,9 @@ fun LoginScreen(
                             Icons.Default.Visibility
                         },
                         contentDescription = if (passwordVisible) {
-                            "Ocultar contraseña"
+                            AppText.get(R.string.ocultar_contrasena)
                         } else {
-                            "Mostrar contraseña"
+                            AppText.get(R.string.mostrar_contrasena)
                         }
                     )
                 }
@@ -120,38 +129,60 @@ fun LoginScreen(
 
 
         TextButton(
-            onClick = { /* Próximamente: recuperar contraseña */ },
+            onClick = onForgotPasswordClick,
             modifier = Modifier.align(Alignment.End)
         ) {
             Text(
-                text = "¿Olvidaste tu contraseña?",
+                text = stringResource(R.string.olvidaste_tu_contrasena),
                 color = LumiColors.Dark
+            )
+        }
+
+        val shownError = errorMessage ?: googleError
+
+        if (!shownError.isNullOrBlank()) {
+            Text(
+                text = shownError,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center
             )
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
         LumiButton(
-            text = "Iniciar sesión",
+            text = if (isLoading) stringResource(R.string.iniciando_sesion) else stringResource(R.string.iniciar_sesion),
             onClick = {
                 if (email.isNotBlank() && password.isNotBlank()) {
                     onLoginClick(email.trim(), password)
                 }
             },
-            enabled = email.isNotBlank() && password.isNotBlank()
+            enabled = email.isNotBlank() && password.isNotBlank() && !isLoading
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        GoogleSignInButton(
+            onIdToken = {
+                googleError = null
+                onGoogleIdToken(it)
+            },
+            onError = { googleError = it },
+            enabled = !isLoading
         )
 
         Spacer(modifier = Modifier.height(12.dp))
 
         TextButton(onClick = onRegisterClick) {
             Text(
-                text = "¿No tienes cuenta? Crear una",
+                text = stringResource(R.string.no_tienes_cuenta_crear_una),
                 color = LumiColors.Dark
             )
         }
 
         TextButton(onClick = onBackClick) {
-            Text("Volver", color = LumiColors.Dark)
+            Text(stringResource(R.string.volver), color = LumiColors.Dark)
         }
     }
 }
