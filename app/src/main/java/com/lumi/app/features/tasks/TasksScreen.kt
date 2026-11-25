@@ -90,6 +90,8 @@ fun TasksScreen(
     var editingTaskId by remember { mutableStateOf<String?>(null) }
 
     val subjects = (uiState as? TasksUiState.Success)?.subjects ?: emptyList()
+    val hasOverdue = (uiState as? TasksUiState.Success)?.tasks
+        ?.any { it.isOverdue(LocalDateTime.now()) } == true
 
     fun closeForm() {
         creating = false
@@ -228,7 +230,7 @@ fun TasksScreen(
                 )
 
                 MascotAnimation(
-                    resId = LumiAnimations.GLANCE,
+                    resId = if (hasOverdue) LumiAnimations.OVERDUE else LumiAnimations.GLANCE,
                     modifier = Modifier
                         .height(72.dp)
                         .aspectRatio(9f / 16f)

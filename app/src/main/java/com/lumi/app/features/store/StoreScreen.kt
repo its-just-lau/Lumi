@@ -1,6 +1,9 @@
 package com.lumi.app.features.store
 
 import com.lumi.app.core.components.LumiEmoji
+import com.lumi.app.mascot.MascotCelebration
+import com.lumi.app.mascot.LumiAnimations
+import com.lumi.app.mascot.MascotImage
 import com.lumi.app.core.components.LumiIcon
 import com.lumi.app.core.components.LumiIconKind
 import androidx.compose.foundation.background
@@ -78,6 +81,24 @@ fun StoreScreen(
     val gems = store.gems
 
     var selectedOffer by remember { mutableStateOf<StoreOffer?>(null) }
+    val purchased by storeViewModel.purchased.collectAsState()
+    var showNoGems by remember { mutableStateOf(false) }
+
+    purchased?.let {
+        MascotCelebration(
+            animationRes = LumiAnimations.PURCHASE,
+            title = it,
+            onDismiss = { storeViewModel.consumePurchased() }
+        )
+    }
+
+    if (showNoGems) {
+        MascotCelebration(
+            animationRes = LumiAnimations.NO_GEMS,
+            title = stringResource(R.string.sin_gemas_suficientes),
+            onDismiss = { showNoGems = false }
+        )
+    }
     var promoCode by remember { mutableStateOf("") }
     var promoMessage by remember { mutableStateOf<String?>(null) }
 
@@ -146,8 +167,11 @@ fun StoreScreen(
                     text = stringResource(R.string.tienda),
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
-                    color = LumiColors.Dark
+                    color = LumiColors.Dark,
+                    modifier = Modifier.weight(1f)
                 )
+                MascotImage(LumiAnimations.STORE, 84.dp)
+                Spacer(modifier = Modifier.width(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     LumiIcon(LumiIconKind.Gem, size = 24.dp)
                     Spacer(modifier = Modifier.width(5.dp))
@@ -304,13 +328,16 @@ fun StoreScreen(
                 TextButton(
                     onClick = {
                         val purchasable = store.items.firstOrNull { it.id == offer.itemId }
-                        if (purchasable != null && gems >= purchasable.priceGems) {
-                            storeViewModel.purchase(purchasable)
+                        if (purchasable != null) {
+                            if (gems >= purchasable.priceGems) {
+                                storeViewModel.purchase(purchasable)
+                            } else {
+                                showNoGems = true
+                            }
                         }
                         selectedOffer = null
                     },
-                    enabled = offer.itemId == null ||
-                            (!buying && offer.price != null && gems >= offer.price)
+                    enabled = offer.itemId == null || (!buying && offer.price != null)
                 ) {
                     Text(
                         if (offer.itemId == null) stringResource(R.string.entendido) else stringResource(R.string.canjear),

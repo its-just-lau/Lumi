@@ -37,6 +37,10 @@ class StoreViewModel(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
+    // Texto de la compra exitosa; al tener valor se muestra la celebración de Lumi.
+    private val _purchased = MutableStateFlow<String?>(null)
+    val purchased: StateFlow<String?> = _purchased.asStateFlow()
+
     fun load() {
         viewModelScope.launch {
             storeRepository.getItems()
@@ -83,7 +87,7 @@ class StoreViewModel(
                         current.inventory + (item.id to it.quantity)
                     } ?: (current.inventory + (item.id to (current.inventory[item.id] ?: 0) + 1))
                 )
-                _message.value = AppText.get(R.string.canjeaste, item.name)
+                _purchased.value = AppText.get(R.string.canjeaste, item.name)
             }.onFailure {
                 _message.value = it.toUserMessage(AppText.get(R.string.no_se_pudo_completar_el))
             }
@@ -94,6 +98,10 @@ class StoreViewModel(
 
     fun consumeMessage() {
         _message.value = null
+    }
+
+    fun consumePurchased() {
+        _purchased.value = null
     }
 }
 

@@ -10,14 +10,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -44,6 +41,14 @@ object LumiAnimations {
     val SESSION_DONE: Int get() = R.raw.lumi_sesion_terminada
     val QUIZ_DONE: Int get() = R.raw.lumi_cuestionario_terminado
     val CARD_MISS: Int get() = R.raw.lumi_tarjeta_fallo
+    val CARD_HIT: Int get() = R.raw.lumi_tarjeta_acierto
+    val WEEKLY_GOAL: Int get() = R.raw.lumi_meta_semanal
+    val OVERDUE: Int get() = R.raw.lumi_tarea_vencida
+    val STORE: Int get() = R.raw.lumi_tienda
+    val PURCHASE: Int get() = R.raw.lumi_compra_exitosa
+    val NO_GEMS: Int get() = R.raw.lumi_sin_gemas
+    val ACHIEVEMENT: Int get() = R.raw.lumi_logro
+    val SLEEPING: Int get() = R.raw.lumi_dormida
 
     /** Sin conexión para fallos de red; error del servidor para el resto. */
     fun forError(message: String): Int = when (message) {
@@ -103,31 +108,32 @@ fun MascotState(
     }
 }
 
-/** Diálogo de la racha: Lumi celebra si hay racha y se anima si aún no. */
+/** Mascota con altura fija y proporción 9:16; con [centered] se centra en el ancho disponible. */
 @Composable
-fun StreakDialog(streakDays: Int, onDismiss: () -> Unit) {
-    val active = streakDays > 0
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = LumiColors.White,
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.entendido)) }
-        },
-        text = {
-            MascotState(
-                animationRes = if (active) LumiAnimations.STREAK_ACTIVE else LumiAnimations.STREAK_NONE,
-                title = stringResource(
-                    if (active) R.string.streak_active_title else R.string.streak_none_title
-                ),
-                message = if (active) {
-                    stringResource(R.string.streak_active_message, streakDays)
-                } else {
-                    stringResource(R.string.streak_none_message)
-                },
-                animationHeight = 230.dp
-            )
-        }
-    )
+fun MascotImage(
+    @RawRes res: Int,
+    height: Dp,
+    modifier: Modifier = Modifier,
+    centered: Boolean = false
+) {
+    val image: @Composable () -> Unit = {
+        MascotAnimation(
+            resId = res,
+            modifier = Modifier
+                .height(height)
+                .aspectRatio(9f / 16f)
+                .clip(RoundedCornerShape(14.dp))
+        )
+    }
+
+    if (centered) {
+        androidx.compose.foundation.layout.Box(
+            modifier = modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) { image() }
+    } else {
+        androidx.compose.foundation.layout.Box(modifier = modifier) { image() }
+    }
 }
 
 /** Diálogo breve de celebración con la mascota; se cierra solo tras [autoDismissMillis]. */

@@ -50,8 +50,6 @@
     <string name="dias_de_racha">días de racha</string>
     <string name="lo_estas_haciendo_genial">¡Lo estás haciendo genial!</string>
     <string name="continua_aprendiendo">Continúa aprendiendo</string>
-    <string name="recursividad_en_kotlin">Recursividad en Kotlin</string>
-    <string name="programacion_movil_2_de_5">Programación móvil · 2 de 5 actividades</string>
     <string name="continuar_leccion">Continuar lección</string>
     <string name="meta_semanal">Meta semanal</string>
     <string name="text">%1$s%%</string>
@@ -476,9 +474,8 @@
     <string name="language">Idioma</string>
     <string name="language_unavailable">Cambia el idioma desde los ajustes de tu dispositivo.</string>
     <string name="mascot_loading">Cargando…</string>
-    <string name="streak_none_title">Aún no tienes racha</string>
-    <string name="streak_none_message">Estudia hoy y enciende tu llama.</string>
-    <string name="streak_active_title">Racha activa</string>
-    <string name="streak_active_message">Llevas %1$d días seguidos. ¡No la pierdas!</string>
     <string name="sesion_terminada">¡Sesión terminada!</string>
+    <string name="retoma_tu_estudio">Retoma tu estudio</string>
+    <string name="repasa_tus_materiales">Repasa tus lecciones, tarjetas y cuestionarios.</string>
+    <string name="sin_gemas_suficientes">Aún no te alcanzan las gemas</string>
 </resources>

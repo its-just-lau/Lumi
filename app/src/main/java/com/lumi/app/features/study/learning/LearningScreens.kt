@@ -115,7 +115,13 @@ fun FlashcardsScreen(
                                 .clip(RoundedCornerShape(18.dp))
                         )
                     } else {
-                        Text("🎉", fontSize = 48.sp)
+                        MascotAnimation(
+                            resId = LumiAnimations.CARD_HIT,
+                            modifier = Modifier
+                                .height(220.dp)
+                                .aspectRatio(9f / 16f)
+                                .clip(RoundedCornerShape(18.dp))
+                        )
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(

@@ -1,6 +1,8 @@
 package com.lumi.app.features.settings
 
 import android.content.Context
+import com.lumi.app.mascot.LumiAnimations
+import com.lumi.app.mascot.MascotImage
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,6 +38,7 @@ fun NotificationsScreen(onBack: () -> Unit) {
     val prefs = remember { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
 
     SettingsScaffold(title = stringResource(R.string.notificaciones), onBack = onBack) {
+        MascotImage(LumiAnimations.SLEEPING, 150.dp, centered = true)
         SettingsSectionTitle(stringResource(R.string.avisos))
         SettingsGroup {
             NotificationSwitch(

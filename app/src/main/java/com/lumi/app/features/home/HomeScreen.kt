@@ -2,6 +2,8 @@
 package com.lumi.app.features.home
 
 import com.lumi.app.core.components.LumiIcon
+import com.lumi.app.mascot.LumiAnimations
+import com.lumi.app.mascot.MascotImage
 import com.lumi.app.core.components.LumiIconKind
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -394,7 +396,7 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        text = stringResource(R.string.recursividad_en_kotlin),
+                        text = stringResource(R.string.retoma_tu_estudio),
                         fontSize = 23.sp,
                         fontWeight = FontWeight.Bold,
                         color = LumiColors.White
@@ -403,21 +405,9 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
-                        text = stringResource(R.string.programacion_movil_2_de_5),
+                        text = stringResource(R.string.repasa_tus_materiales),
                         fontSize = 13.sp,
                         color = LumiColors.Yellow
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    LinearProgressIndicator(
-                        progress = { 0.4f },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(9.dp)
-                            .clip(CircleShape),
-                        color = LumiColors.Yellow,
-                        trackColor = Color(0xFF8D793A)
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -463,12 +453,16 @@ fun HomeScreen(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.TrackChanges,
-                            contentDescription = null,
-                            tint = LumiColors.YellowStrong,
-                            modifier = Modifier.size(38.dp)
-                        )
+                        if (weeklyProgress >= 1f) {
+                            MascotImage(LumiAnimations.WEEKLY_GOAL, 64.dp)
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.TrackChanges,
+                                contentDescription = null,
+                                tint = LumiColors.YellowStrong,
+                                modifier = Modifier.size(38.dp)
+                            )
+                        }
 
                         Spacer(modifier = Modifier.width(12.dp))
 

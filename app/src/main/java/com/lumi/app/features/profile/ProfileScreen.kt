@@ -1,6 +1,8 @@
 package com.lumi.app.features.profile
 
 import com.lumi.app.core.components.LumiEmoji
+import com.lumi.app.mascot.LumiAnimations
+import com.lumi.app.mascot.MascotImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -352,12 +354,16 @@ fun ProfileScreen(
 
             // LOGROS
             Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                Text(
-                    text = stringResource(R.string.logros),
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = LumiColors.Dark
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = stringResource(R.string.logros),
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = LumiColors.Dark,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MascotImage(LumiAnimations.ACHIEVEMENT, 72.dp)
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

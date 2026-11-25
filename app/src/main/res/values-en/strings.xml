@@ -50,8 +50,6 @@
     <string name="dias_de_racha">day streak</string>
     <string name="lo_estas_haciendo_genial">You\'re doing great!</string>
     <string name="continua_aprendiendo">Keep learning</string>
-    <string name="recursividad_en_kotlin">Recursion in Kotlin</string>
-    <string name="programacion_movil_2_de_5">Mobile programming · 2 of 5 activities</string>
     <string name="continuar_leccion">Continue lesson</string>
     <string name="meta_semanal">Weekly goal</string>
     <string name="text">%1$s%%</string>
@@ -476,9 +474,8 @@
     <string name="language">Language</string>
     <string name="language_unavailable">Change the language from your device settings.</string>
     <string name="mascot_loading">Loading…</string>
-    <string name="streak_none_title">You have no streak yet</string>
-    <string name="streak_none_message">Study today and light your flame.</string>
-    <string name="streak_active_title">Streak on</string>
-    <string name="streak_active_message">You\'re on a %1$d-day streak. Don\'t lose it!</string>
     <string name="sesion_terminada">Session complete!</string>
+    <string name="retoma_tu_estudio">Pick up your studying</string>
+    <string name="repasa_tus_materiales">Review your lessons, flashcards and quizzes.</string>
+    <string name="sin_gemas_suficientes">You don\'t have enough gems yet</string>
 </resources>
