@@ -1,60 +1,16 @@
 # Backend de Lumi
 
-API REST del proyecto Lumi. Este documento es el esqueleto de la guía del backend y se completa en cada fase del plan (`PLAN_EJECUTOR_LUMI.md`).
+API REST del proyecto Lumi. Implementa el contrato `api/openapi.yaml` (v1.4.0) bajo el prefijo `/api/v1`. Esta guía se actualiza en cada fase del plan (`PLAN_EJECUTOR_LUMI.md`).
 
-> **Estado actual: Fase 0.** El backend todavía no tiene código ejecutable. La Fase 1 crea el esqueleto de FastAPI, el endpoint `/health`, Swagger y el workflow de CI. Los comandos de arranque de esta guía se habilitan al terminar esa fase.
+> **Estado actual: Fase 1.** El esqueleto de FastAPI ya funciona: `GET /api/v1/health`, Swagger en `/docs`, formato de error del contrato, `X-Request-Id`, `Accept-Language`, CORS y CI. La base de datos, la cola, la autenticación y la IA llegan en las fases 2 a 7.
 
-## Contrato
+## Requisitos
 
-- `api/openapi.yaml` (v1.4.0) es la fuente de verdad del contrato REST.
-- El API se publica bajo el prefijo `/api/v1`.
-- Swagger se mostrará en `/docs` y la especificación generada en `/openapi.json`.
-- La app Android usa Prism en `http://localhost:4010/` como mock de desarrollo; el backend debe cumplir el mismo contrato.
-
-## Stack previsto
-
-- Python 3.12 + FastAPI + Pydantic v2.
-- SQLAlchemy 2.0 + Alembic sobre PostgreSQL (Neon).
-- MongoDB Atlas para contenido generado y archivos (GridFS).
-- RabbitMQ (CloudAMQP) para la cola de procesamiento de materiales.
-- Gemini mediante la interfaz `AiProvider`.
-- pytest + httpx para pruebas; ruff para lint y formato.
-- Render para el despliegue del API y GitHub Actions para CI/CD.
-
-Las versiones exactas se fijan en `requirements.txt` y `requirements-dev.txt` durante la Fase 1.
-
-## Estructura prevista
-
-```text
-backend/
-├── README.md
-├── .env.example              # variables sin valores reales
-├── requirements.txt
-├── requirements-dev.txt
-├── alembic.ini
-├── migrations/
-├── scripts/
-│   ├── seed_demo.py
-│   ├── diff_openapi.py
-│   └── warmup.ps1
-├── tests/
-│   ├── unit/
-│   ├── integration/
-│   └── contract/
-└── app/
-    ├── main.py
-    ├── core/
-    ├── shared/
-    ├── modules/
-    ├── integrations/
-    └── workers/
-```
-
-La arquitectura sigue capas estrictas: **Controllers → Services → Repositories → Entities**, con **Schemas** como DTOs de entrada y salida. Las integraciones externas se llaman solo desde Services.
+- Python 3.12 (local, CI y Render usan la misma versión).
+- PowerShell en Windows.
+- Git.
 
 ## Arranque en Windows (PowerShell)
-
-Estos comandos se completan en la Fase 1:
 
 ```powershell
 # Desde la raíz del repositorio
@@ -65,44 +21,33 @@ pip install -r requirements.txt -r requirements-dev.txt
 
 # Copiar variables de entorno (nunca subir el .env real)
 Copy-Item .env.example .env
-# Editar .env con los valores locales
 
 # Levantar el servidor de desarrollo
 uvicorn app.main:app --reload
 ```
 
-Luego abrir:
+Si `python` no apunta a 3.12, usa `py -3.12 -m venv .venv`.
+
+Luego abre:
 
 - Swagger: `http://localhost:8000/docs`
-- Especificación: `http://localhost:8000/openapi.json`
+- Especificación generada: `http://localhost:8000/openapi.json`
 - Salud: `http://localhost:8000/api/v1/health`
 
-## Variables de entorno
+Respuesta esperada de `/api/v1/health` en la Fase 1:
 
-El archivo real `backend/.env` está ignorado por Git. En la Fase 1 se versiona `backend/.env.example` con marcadores, sin secretos. Variables previstas:
+```json
+{
+  "status": "ok",
+  "version": "0.1.0",
+  "queue": "not_configured",
+  "time": "2026-11-25T15:04:05Z"
+}
+```
 
-| Variable | Uso |
-|---|---|
-| `APP_ENV` | Entorno (`development`, `production`). |
-| `APP_BASE_URL` | URL pública del API. |
-| `CORS_ORIGINS` | Orígenes permitidos, separados por coma. |
-| `DATABASE_URL` | Cadena PostgreSQL con SSL (Neon). |
-| `MONGODB_URI` / `MONGODB_DB` | Conexión y base documental. |
-| `RABBITMQ_URL` | Cadena AMQP del broker. |
-| `WORKER_ENABLED` | Activa el consumidor de la cola en el mismo servicio. |
-| `JWT_SECRET` | Firma de tokens; se cambia en producción. |
-| `JWT_ACCESS_MINUTES` / `JWT_REFRESH_DAYS` | Vigencias de tokens. |
-| `GOOGLE_WEB_CLIENT_ID` | ID público de cliente Web para Google Sign-In. |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | Proveedor de IA. |
-| `AI_DAILY_LIMIT_PER_USER` | Límite diario de procesamiento por usuario. |
-| `REMINDER_CRON_TOKEN` | Protección del endpoint interno de recordatorios (opcional). |
-| `FCM_SERVICE_ACCOUNT_JSON_PATH` | Ruta local a la cuenta de servicio de FCM (opcional). |
-
-Nunca se escriben claves reales en el repositorio, en `README.md` ni en `AGENTS.md`.
+`database` se omite a propósito: el esquema `Health` del contrato solo admite `ok` o `down` para ese campo, y en la Fase 1 todavía no hay base de datos. Se añadirá en la Fase 2.
 
 ## Pruebas y calidad
-
-Se habilitan en la Fase 1:
 
 ```powershell
 cd backend
@@ -111,13 +56,81 @@ ruff check .
 ruff format --check .
 ```
 
-El workflow `.github/workflows/backend-ci.yml` ejecutará lint, pruebas y, más adelante, la prueba de contrato con Schemathesis.
+- Las pruebas usan `pytest` y el `TestClient` de Starlette (con `httpx2`, que es el cliente que Starlette recomienda ahora).
+- `pyproject.toml` añade `backend/` a `sys.path`, así que `pytest` funciona sin instalar el proyecto como paquete.
+- `ruff` aplica lint y formato con la configuración de `pyproject.toml`.
+- El workflow `.github/workflows/backend-ci.yml` ejecuta `ruff check`, `ruff format --check` y `pytest` en cada push y en cada Pull Request, con Python 3.12.
+
+### Comparación con el contrato
+
+```powershell
+python scripts/diff_openapi.py          # informa diferencias y sale con 0
+python scripts/diff_openapi.py --strict # sale con 1 si hay diferencias
+```
+
+En la Fase 1 compara rutas, métodos y `operationId`; la comparación de esquemas se completa en las fases 4 y 8. Al terminar la Fase 1 informa 72 operaciones en el contrato y 1 implementada (`GET /health`).
+
+## Estructura actual
+
+```text
+backend/
+├── README.md
+├── .env.example
+├── pyproject.toml              # configuración de ruff y pytest
+├── requirements.txt
+├── requirements-dev.txt
+├── scripts/
+│   └── diff_openapi.py
+├── tests/
+│   └── unit/                   # health, errores, X-Request-Id, Accept-Language
+└── app/
+    ├── __init__.py             # versión del API
+    ├── main.py                 # app, middlewares, routers, lifespan
+    ├── core/
+    │   ├── config.py           # variables de entorno con pydantic-settings
+    │   ├── errors.py           # ApiError y formato { code, message, details?, requestId }
+    │   ├── i18n.py             # mensajes es/en y negociación de Accept-Language
+    │   ├── logging.py          # logs con request_id
+    │   └── request_id.py       # middleware X-Request-Id
+    ├── shared/                 # paginación, ETag, fechas UTC (fases posteriores)
+    └── modules/
+        └── system/             # controllers y schemas de /health
+```
+
+Cuando existan módulos de dominio se añadirán `services.py`, `repositories.py` y `entities.py`, respetando **Controllers → Services → Repositories → Entities**. Las integraciones externas se llaman solo desde Services.
+
+## Convenciones implementadas
+
+- **Errores:** siempre `{ code, message, details?, requestId }`. `message` se traduce según `Accept-Language` (`es` por defecto, `en` disponible). Las excepciones no controladas se convierten en `INTERNAL_ERROR` sin filtrar trazas.
+- **`X-Request-Id`:** se reutiliza si llega un UUID válido; si no, se genera uno. Viaja en la respuesta y en los logs de cada petición.
+- **CORS:** se configura con `CORS_ORIGINS` (lista separada por comas) y expone `X-Request-Id` y `ETag`.
+- **Middleware:** CORS queda en el exterior para que los errores también lleven sus encabezados, y el manejador de errores va dentro del de `X-Request-Id`.
+- **Swagger:** es *code-first*; la fuente de verdad sigue siendo `api/openapi.yaml`.
+
+## Variables de entorno
+
+El archivo real `backend/.env` está ignorado por Git. Se versiona `.env.example` con marcadores, sin secretos. En la Fase 1 solo se leen estas:
+
+| Variable | Uso |
+|---|---|
+| `APP_ENV` | Entorno (`development`, `production`). |
+| `APP_BASE_URL` | URL pública del API. |
+| `CORS_ORIGINS` | Orígenes permitidos, separados por coma. |
+
+El resto de variables de `.env.example` (base de datos, cola, JWT, Google, Gemini, recordatorios, FCM) se activan en las fases 2, 3, 6 y 7.
 
 ## Despliegue
 
 - El API se despliega en Render desde la rama `main`.
 - Las variables de entorno se configuran en el panel de Render, no en el repositorio.
 - El despliegue automático se condiciona a que el CI esté en verde (Fase 8).
+
+## Solución de problemas
+
+- **`python` abre otra versión:** usa `py -3.12 -m venv .venv`.
+- **`Activate.ps1` bloqueado:** ejecuta `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`.
+- **`/docs` no carga:** confirma que `uvicorn` se lanzó desde `backend/`, no desde la raíz.
+- **Swagger sin `/api/v1`:** las rutas se montan con el prefijo; si no aparece, revisa `app.include_router(..., prefix=API_PREFIX)` en `app/main.py`.
 
 ## Documentación relacionada
 

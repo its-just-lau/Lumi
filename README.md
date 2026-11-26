@@ -5,7 +5,7 @@ Lumi es una aplicación Android para organizar el estudio: materias y semestres,
 ## Estado del repositorio
 
 - **App Android:** funcional y en desarrollo activo. No se modifica como parte del plan del backend.
-- **Backend:** en construcción. La Fase 0 deja la documentación y la configuración de Git; la Fase 1 crea el esqueleto de FastAPI.
+- **Backend:** en construcción. La Fase 1 deja el esqueleto de FastAPI funcionando (`/api/v1/health`, Swagger, errores del contrato y CI); las fases 2 a 9 añaden base de datos, autenticación, dominio y despliegue.
 - **Contrato:** `api/openapi.yaml` es la fuente de verdad. El backend debe cumplirlo y la app lo consume mediante Retrofit.
 
 ## Organización
@@ -78,7 +78,20 @@ Las convenciones detalladas para contribuir están en `AGENTS.md`.
 
 ## Backend
 
-La guía del backend está en [`backend/README.md`](backend/README.md). Resume el stack, la estructura prevista, las variables de entorno y los comandos que se habilitan en la Fase 1.
+La guía completa está en [`backend/README.md`](backend/README.md). Arranque rápido en Windows (Python 3.12):
+
+```powershell
+cd backend
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt -r requirements-dev.txt
+Copy-Item .env.example .env
+uvicorn app.main:app --reload
+```
+
+- Swagger: `http://localhost:8000/docs`
+- Salud: `http://localhost:8000/api/v1/health`
+- Pruebas: `pytest` y `ruff check .` desde `backend/`
 
 Resumen del stack:
 
@@ -99,7 +112,7 @@ Resumen del stack:
 
 ## Git y colaboración
 
-- Ramas personales por integrante; los cambios llegan a `develop` mediante Pull Request y luego a `main`.
+- Ramas personales por integrante; los cambios llegan a `develop` mediante Pull Request al cerrar cada fase, y a `main` en un único Pull Request al terminar todas las fases.
 - Convención de commits: Conventional Commits con alcance, por ejemplo `feat(auth): registro e inicio de sesión con JWT`.
 - `main` y `develop` requieren PR y CI en verde.
 - Los secretos, `local.properties`, los archivos `.env` reales y los reportes de `reportes/` nunca se versionan.
