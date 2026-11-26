@@ -1,0 +1,6 @@
+# Dependencias de ejecución del API (Fase 1).
+# Versiones fijadas para que local, CI y Render usen exactamente lo mismo.
+fastapi==0.165.0
+pydantic==2.14.4
+pydantic-settings==2.16.3
+uvicorn[standard]==0.54.0
