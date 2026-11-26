@@ -16,3 +16,4 @@ Registro exigido por la rúbrica y por la sección 10 del plan. Cada entrada doc
 
 - La verificación local se hizo con Python 3.13 porque la máquina no tenía 3.12 instalado; el proyecto queda fijado a 3.12 en CI y en la documentación, y el usuario debe crear el `.venv` con 3.12.
 - El `TestClient` de Starlette emite una advertencia de obsolescencia con `httpx` clásico; se adoptó `httpx2`, el cliente que la propia librería recomienda, y las pruebas quedan sin advertencias.
+- **Segundo error detectado:** el CI de GitHub falló con `ModuleNotFoundError: No module named 'app'` aunque las pruebas pasaban en local. La causa fue invocar `pytest` como ejecutable, que no añade el directorio actual a `sys.path`; la verificación local se había hecho con `python -m pytest`, que sí lo añade. Se detectó al leer el log del PR y se corrigió con `pythonpath = ["."]` en `pyproject.toml`, verificando después ambas formas de ejecución.

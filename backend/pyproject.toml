@@ -18,3 +18,6 @@ quote-style = "double"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
+# `pytest` (el ejecutable) no añade el directorio actual a sys.path; con esto
+# `from app.main import ...` funciona igual con `pytest` que con `python -m pytest`.
+pythonpath = ["."]

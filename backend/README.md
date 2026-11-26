@@ -57,6 +57,7 @@ ruff format --check .
 ```
 
 - Las pruebas usan `pytest` y el `TestClient` de Starlette (con `httpx2`, que es el cliente que Starlette recomienda ahora).
+- `pyproject.toml` añade `backend/` a `sys.path`, así que `pytest` funciona sin instalar el proyecto como paquete.
 - `ruff` aplica lint y formato con la configuración de `pyproject.toml`.
 - El workflow `.github/workflows/backend-ci.yml` ejecuta `ruff check`, `ruff format --check` y `pytest` en cada push y en cada Pull Request, con Python 3.12.
 
