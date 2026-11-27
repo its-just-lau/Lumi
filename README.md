@@ -5,7 +5,7 @@ Lumi es una aplicación Android para organizar el estudio: materias y semestres,
 ## Estado del repositorio
 
 - **App Android:** funcional y en desarrollo activo. No se modifica como parte del plan del backend.
-- **Backend:** en construcción. La Fase 1 deja el esqueleto de FastAPI funcionando (`/api/v1/health`, Swagger, errores del contrato y CI); las fases 2 a 9 añaden base de datos, autenticación, dominio y despliegue.
+- **Backend:** en construcción. La Fase 2 deja PostgreSQL con SQLAlchemy y Alembic, la migración inicial, datos de demostración, `/health` con estado real de la base y el servicio preparado para Render; las fases 3 a 9 añaden autenticación, dominio, IA y despliegue final.
 - **Contrato:** `api/openapi.yaml` es la fuente de verdad. El backend debe cumplirlo y la app lo consume mediante Retrofit.
 
 ## Organización
@@ -19,7 +19,7 @@ Lumi/
 ├── docs/                 # Guías de Google, uso de IA y documentación interna
 ├── reportes/             # Reportes de análisis (ignorado por Git)
 ├── gradle/               # Catálogo de versiones y wrapper
-├── .github/workflows/    # CI de Android y, más adelante, del backend
+├── .github/workflows/    # CI de Android y del backend
 ├── AGENTS.md             # Guía local para agentes de IA (ignorada por Git)
 └── PLAN_EJECUTOR_LUMI.md # Plan de trabajo local (ignorado por Git)
 ```
@@ -86,12 +86,17 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt -r requirements-dev.txt
 Copy-Item .env.example .env
+# Editar .env con la DATABASE_URL de Neon o de un PostgreSQL local
+alembic upgrade head
+python scripts/seed_demo.py
 uvicorn app.main:app --reload
 ```
 
 - Swagger: `http://localhost:8000/docs`
 - Salud: `http://localhost:8000/api/v1/health`
 - Pruebas: `pytest` y `ruff check .` desde `backend/`
+- Base de datos: `alembic upgrade head`; datos demo: `python scripts/seed_demo.py`
+- URL pública: pendiente de crear el servicio en Render (Fase 2).
 
 Resumen del stack:
 
