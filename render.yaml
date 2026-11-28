@@ -1,0 +1,26 @@
+# Blueprint de Render para el backend de Lumi (Fase 2, tarea F2-07).
+#
+# En Render: New > Blueprint, conectar el repositorio y aplicar este archivo.
+# El servicio se crea desde `develop` para respetar la regla de Git de no tocar
+# `main` hasta la entrega final. En la Fase 8 se cambia la rama a `main`.
+#
+# La única variable obligatoria que hay que escribir en el panel es
+# `DATABASE_URL`, con la cadena directa de Neon y `sslmode=require`.
+
+services:
+  - type: web
+    name: lumi-api
+    runtime: python
+    branch: develop
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.10"
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false

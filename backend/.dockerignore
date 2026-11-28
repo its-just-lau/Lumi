@@ -1,0 +1,15 @@
+# Secretos y entorno local: nunca entran en la imagen.
+.env
+.env.*
+!.env.example
+.venv/
+
+# Cachés y artefactos
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Control de versiones y documentación local
+.git/
+.gitignore

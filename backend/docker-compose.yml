@@ -1,0 +1,48 @@
+# Entorno local completo: PostgreSQL 17 + API.
+# Uso:
+#   docker compose up --build
+#   docker compose exec api python scripts/seed_demo.py --password "..."
+#
+# Los datos viven en el volumen `lumi_pgdata`. `docker compose down -v` los borra.
+
+name: lumi
+
+services:
+  db:
+    image: postgres:17
+    container_name: lumi-db
+    environment:
+      POSTGRES_USER: lumi
+      POSTGRES_PASSWORD: lumi
+      POSTGRES_DB: lumi
+    ports:
+      # 5433 en el host para no chocar con un PostgreSQL instalado en Windows.
+      - "5433:5432"
+    volumes:
+      - lumi_pgdata:/var/lib/postgresql/data
+      - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/10-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lumi -d lumi"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build: .
+    container_name: lumi-api
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://lumi:lumi@db:5432/lumi
+      CORS_ORIGINS: http://localhost:8000
+      PYTHON_VERSION: "3.12"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+volumes:
+  lumi_pgdata:

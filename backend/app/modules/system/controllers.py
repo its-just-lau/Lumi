@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter
 
 from app import __version__
+from app.core.database import check_database, is_database_configured
 from app.modules.system.schemas import HealthResponse
 
 router = APIRouter(tags=["System"])
@@ -19,20 +20,33 @@ router = APIRouter(tags=["System"])
     summary="Estado del servicio",
     description=(
         "Sin autenticación. Sirve para monitoreo y para calentar el servicio antes de "
-        "una demo. PostgreSQL y la cola se reportan al configurarse en las fases 2 y 6."
+        "una demo. PostgreSQL se consulta de verdad en la Fase 2; la cola se reporta "
+        "al configurarse en la Fase 6."
     ),
     operation_id="getHealth",
 )
 async def get_health() -> HealthResponse:
-    """Devuelve el estado del API.
+    """Devuelve el estado del API y de sus dependencias.
 
-    La base de datos se omite mientras no esté configurada (Fase 2) porque el
-    contrato solo admite `ok` o `down` para ese campo. La cola sí admite
-    `not_configured`.
+    `database` se omite mientras `DATABASE_URL` no esté configurada, porque el
+    esquema `Health` del contrato solo admite `ok` o `down` para ese campo (no
+    existe `not_configured`). Cuando la base responde, el estado general sigue
+    siendo `ok`; si no responde, se marca `degraded` y `database: down`.
     """
+    database: str | None = None
+    status: str = "ok"
+
+    if is_database_configured():
+        if check_database():
+            database = "ok"
+        else:
+            database = "down"
+            status = "degraded"
+
     return HealthResponse(
-        status="ok",
+        status=status,
         version=__version__,
+        database=database,
         queue="not_configured",
         time=datetime.now(UTC),
     )

@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_base_url: str = "http://localhost:8000"
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:8000"]
+    database_url: str = ""
 
     @field_validator("cors_origins", mode="before")
     @classmethod
